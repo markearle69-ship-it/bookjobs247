@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ settings.brand_name }} – simple, low-cost tools that do the admin for tradespeople{% endblock %}
+{% block body %}
+<section class="hero">
+  <div class="inner">
+    <div class="eyebrow">For local service businesses</div>
+    <h1>We do the admin.<br>You stay on the tools.</h1>
+    <p>Missed calls, quotes, follow-ups, reviews: the jobs that eat your evenings. {{ settings.brand_name }} is a set of
+      simple apps that handle them for a small monthly price, so you can spend your time on paid work.</p>
+    <div class="cta-row">
+      <a class="btn" href="/{{ settings.product_slug }}">See {{ settings.app_name }}</a>
+      <a class="btn ghost" href="#tools">All tools</a>
+    </div>
+    <p class="small" style="margin-top:14px;color:#9fb0c2">Built by a local service business owner since 2002 · No contracts · No setup fees</p>
+  </div>
+</section>
+
+<main class="wrap-wide">
+  <section id="tools">
+    <h2>The tools</h2>
+    {% if joined %}<div class="success">Thanks, we'll email you as soon as it's ready.</div>{% endif %}
+    <div class="tools-grid">
+      {% for p in products %}
+      <div class="card tool-card {{ p.status }}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="icon">{{ p.icon }}</span>
+          <span class="status {{ p.status }}">{{ 'Available now' if p.status == 'live' else 'Coming soon' }}</span>
+        </div>
+        <h3 style="font-size:1.2rem;margin-top:8px">{{ p.name }}</h3>
+        <p style="font-weight:600;margin-bottom:6px">{{ p.tagline }}</p>
+        <p class="muted">{{ p.blurb }}</p>
+        {% if p.status == 'live' %}
+          <p style="margin-top:auto"><strong>{{ plan.monthly_label }}/month</strong> <span class="muted small">· no contract</span></p>
+          <a class="btn block" href="{{ p.url }}">See how it works</a>
+        {% else %}
+          <form method="post" action="/waitlist">
+            <input type="hidden" name="product" value="{{ p.key }}">
+            <input type="email" name="email" required placeholder="Your email" aria-label="Your email">
+            <button class="btn secondary">Tell me when it's ready</button>
+          </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section>
+    <h2>Why {{ settings.brand_name }}</h2>
+    <div class="features">
+      <div class="card"><h3>Priced for one-person businesses</h3><p class="muted">Agencies charge hundreds a month for
+        this kind of software. Each of our tools costs less than an hour of your time a month.</p></div>
+      <div class="card"><h3>Set up in minutes, not weeks</h3><p class="muted">Sign up, answer a few questions about
+        your business, done. No discovery calls, no onboarding meetings.</p></div>
+      <div class="card"><h3>Made by someone who's been there</h3><p class="muted">Built by a tradesperson who lost too many
+        jobs to the phone ringing at the wrong moment.</p></div>
+    </div>
+  </section>
+
+  <section class="card" style="text-align:center">
+    <h2>Start with the one that pays for itself</h2>
+    <p class="muted">{{ settings.app_name }} answers the calls you miss. Win back one job and it's paid for months.</p>
+    <a class="btn" href="/{{ settings.product_slug }}">See {{ settings.app_name }}</a>
+  </section>
+</main>
+{% endblock %}

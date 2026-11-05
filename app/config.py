@@ -2,14 +2,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "BookJobs247"
+    # Umbrella brand (the sales site) and this tool's name. Both are only
+    # display names - change them here or via env vars, no rebuild needed.
+    brand_name: str = "On The Tools"
+    app_name: str = "Call Keeper"
+    # URL path of this tool's page on the umbrella site.
+    product_slug: str = "call-keeper"
+    support_email: str = ""
 
     # This service's public HTTPS URL, no trailing slash. Used to build every
     # webhook URL (Twilio, Retell, Stripe redirects) and to validate Twilio
     # request signatures, which are computed over the exact public URL.
     public_base_url: str = "http://localhost:8000"
 
-    database_url: str = "sqlite:///./bookjobs247.db"
+    database_url: str = "sqlite:///./onthetools.db"
 
     # Signs login sessions and password-reset links. Empty = refuse to start
     # (see main.py) rather than silently signing with a guessable key.

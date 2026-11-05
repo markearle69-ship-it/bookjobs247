@@ -15,6 +15,10 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.filters["pretty"] = pretty
 templates.env.globals["settings"] = settings
 templates.env.globals["plan_for"] = plan_for
+# Logo: "On The <span>Tools</span>" - last word highlighted.
+_head, _, _tail = settings.brand_name.rpartition(" ")
+templates.env.globals["brand_head"] = _head
+templates.env.globals["brand_tail"] = _tail
 
 
 class LoginRequired(Exception):

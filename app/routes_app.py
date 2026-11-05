@@ -13,9 +13,11 @@ from .config import settings
 from .db import get_db
 from .emails import send_email
 from .forwarding import codes_for
-from .models import Account, Call, PushSubscription, TradeTemplate, utcnow
+from .models import Account, Call, PushSubscription, TradeTemplate, WaitlistSignup, utcnow
 from .phone import normalize
 from .plans import plan_for
+from .products import product as get_product
+from .products import products
 from .push import send_to_account
 from .trades import BY_KEY, BY_SLUG, grouped_trades, marketing_trades
 from .security import (SESSION_COOKIE, SESSION_MAX_AGE, hash_password, make_reset_token, make_session,
@@ -36,14 +38,33 @@ def _login_response(url: str, account: Account) -> RedirectResponse:
 # ---------------------------------------------------------------- public
 
 @router.get("/")
-def landing(request: Request, country: str = "", account: Account | None = Depends(current_account),
-            db: Session = Depends(get_db)):
+def home(request: Request, country: str = "", joined: str = "", account: Account | None = Depends(current_account)):
+    region = region_for(request, country)
+    return render(request, "home.html", account=account, region=region, plan=plan_for(region),
+                  products=products(), joined=joined, marketing_page=True)
+
+
+@router.post("/waitlist")
+def join_waitlist(email: str = Form(...), product: str = Form(...), trade: str = Form(""),
+                  db: Session = Depends(get_db)):
+    email = email.strip().lower()[:255]
+    if "@" in email and get_product(product) and get_product(product).status == "soon":
+        exists = db.query(WaitlistSignup).filter(WaitlistSignup.email == email,
+                                                 WaitlistSignup.product == product).first()
+        if not exists:
+            db.add(WaitlistSignup(email=email, product=product, trade=trade.strip()[:120]))
+            db.commit()
+    return RedirectResponse(f"/?joined={product}#tools", status_code=303)
+
+
+@router.get(f"/{settings.product_slug}")
+def product_page(request: Request, country: str = "", account: Account | None = Depends(current_account)):
     region = region_for(request, country)
     return render(request, "landing.html", account=account, region=region, plan=plan_for(region),
-                  trade=None, marketing=marketing_trades(), questions=None)
+                  trade=None, marketing=marketing_trades(), questions=None, marketing_page=True)
 
 
-@router.get("/for/{slug}")
+@router.get(f"/{settings.product_slug}/for/{{slug}}")
 def trade_page(request: Request, slug: str, country: str = "", account: Account | None = Depends(current_account),
                db: Session = Depends(get_db)):
     t = BY_SLUG.get(slug)
@@ -54,7 +75,12 @@ def trade_page(request: Request, slug: str, country: str = "", account: Account 
     questions = [q.lstrip("- ").strip() for q in ((row.questions if row else t.questions) or "").splitlines()
                  if q.strip()]
     return render(request, "landing.html", account=account, region=region, plan=plan_for(region), trade=t,
-                  marketing=marketing_trades(), questions=questions)
+                  marketing=marketing_trades(), questions=questions, marketing_page=True)
+
+
+@router.get("/for/{slug}")
+def old_trade_page(slug: str):
+    return RedirectResponse(f"/{settings.product_slug}/for/{slug}", status_code=301)
 
 
 @router.get("/signup")

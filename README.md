@@ -1,21 +1,41 @@
-# BookJobs247
+# On The Tools · Call Keeper
+
+**On The Tools** is the umbrella brand: one sales site listing a portfolio of
+low-cost apps that do the admin for local service businesses. **Call Keeper**
+is the first tool. Both names are settings (`BRAND_NAME`, `APP_NAME`,
+`PRODUCT_SLUG`), so renaming needs no code change.
+
+Site map (one deployment serves everything):
+
+| Path | What |
+|---|---|
+| `/` | Umbrella home: all tools, "coming soon" waitlists (signups in `/admin`) |
+| `/call-keeper` | Call Keeper sales page: agency comparison, ROI calculator, pricing, FAQ |
+| `/call-keeper/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
+| `/signup`, `/app` | The Call Keeper app (installable on the phone's home screen) |
+| `/admin`, `/admin/trades` | Your operator panel and the trade-script editor |
+
+To add a future tool to the home page, add it to `app/products.py`.
+
+## Call Keeper
 
 An AI receptionist for local tradespeople. The owner forwards the calls they
-miss to their BookJobs247 number. When a call comes in, a voice agent answers
+miss to their Call Keeper number. When a call comes in, a voice agent answers
 in their business's name and takes the caller's name, callback number,
 address, the job and how urgent it is. The owner gets a push notification
 and can see every call in a phone-friendly app. A one-tap **ON/OFF** switch
 sends missed calls to a plain voicemail instead.
 
-Self-serve: sign up → business details → pay (Stripe) → number assigned
-automatically → one-tap forwarding codes → done.
+Self-serve: sign up → business details (trade, greeting name, assistant name,
+voice, US area code) → pay (Stripe) → number assigned automatically → one-tap
+forwarding codes → done.
 
 | | US | UK |
 |---|---|---|
-| Price | $19/month | £15/month |
-| Included | 30 answered minutes | 30 answered minutes |
+| Price | $29/month | £25/month |
+| Included | 60 answered minutes | 60 answered minutes |
 | Overage | $0.25/min (metered) | £0.20/min (metered) |
-| Number | Bought instantly from Twilio | Assigned from your pre-bought pool |
+| Number | Local number in their area code, bought instantly | 07 mobile number from your pre-bought pool |
 
 Voicemail (when the assistant is OFF, or as a fallback) is never billed.
 
@@ -23,7 +43,7 @@ Voicemail (when the assistant is OFF, or as a fallback) is never billed.
 
 ```
 Caller ─► owner's mobile (rings first) ─► not answered / busy / no signal
-       ─► carrier forwards to the BookJobs247 Twilio number
+       ─► carrier forwards to the Call Keeper Twilio number
        ─► POST /twilio/voice
             ├─ assistant ON + subscription active:
             │     register call with Retell (business details as dynamic variables)
@@ -35,11 +55,17 @@ Caller ─► owner's mobile (rings first) ─► not answered / busy / no signa
 ```
 
 Some details of the design:
-- **Two shared Retell agents in total** (one US voice, one UK voice), not one
-  per customer. Each call passes in that business's details as Retell
-  dynamic variables, so a customer can edit their details in Settings and the
-  next call uses them. Editing `app/agent_prompt.py` and running
-  `scripts/setup_retell.py --update` changes every customer's agent at once.
+- **Four shared Retell agents in total** (US/UK accent × female/male voice),
+  not one per customer. Each call passes in that business's details, greeting
+  and its **trade script** (questions + emergency rules, from `/admin/trades`)
+  as Retell dynamic variables. Customers edit their details in Settings and the
+  next call uses them; you edit a trade's script in `/admin/trades` and every
+  customer in that trade gets it on their next call. Editing
+  `app/agent_prompt.py` and running `scripts/setup_retell.py --update` changes
+  the core script for everyone.
+- **Emergency calls** (as judged against the trade's emergency rules) send a
+  🚨 push that stays on screen and vibrates hard, re-sent at 5 and 15 minutes
+  until the owner opens the call. No SMS, because of US A2P 10DLC registration.
 - **No SIP trunk** is needed. Each call is registered with Retell's
   register-phone-call API and dialled over SIP, which is what lets the
   ON/OFF switch work per call.
@@ -93,12 +119,13 @@ Set `POSTMARK_API_TOKEN` + `EMAIL_FROM` (or the SMTP settings).
 ### 5. Retell
 1. Set `RETELL_API_KEY`. It is used both for API calls and to verify webhook
    signatures.
-2. Pick voices and create the two agents:
+2. Pick voices and create the four agents:
    ```bash
    python scripts/setup_retell.py --list-voices
-   python scripts/setup_retell.py --voice-us <id> --voice-gb <id>
+   python scripts/setup_retell.py --us-female <id> --us-male <id> --gb-female <id> --gb-male <id>
    ```
-   Set the printed `RETELL_AGENT_ID_US` and `RETELL_AGENT_ID_GB`. The agents
+   Set the four printed `RETELL_AGENT_ID_*` values. A missing male voice falls
+   back to that country's female agent. The agents
    have their webhook (`/webhooks/retell`), post-call analysis fields and a
    10-minute call cap configured.
 3. To change the script later, edit `app/agent_prompt.py`, then run
@@ -117,7 +144,7 @@ Set `POSTMARK_API_TOKEN` + `EMAIL_FROM` (or the SMTP settings).
    voicemails) is enabled by default.
 
 ### 7. End-to-end test (Stripe test mode)
-Sign up with a test card (`4242 4242 4242 4242`), forward a phone to the
+Sign up at `/signup` with a test card (`4242 4242 4242 4242`), forward a phone to the
 number, and call it from another phone without answering. Check that:
 - the agent answers in your business's name
 - the call appears in `/app` with the details, and you get a push notification

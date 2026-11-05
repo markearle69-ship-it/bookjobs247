@@ -65,5 +65,16 @@
     </table>
     </div>
   </div>
+  <div class="card">
+    <h2>"Coming soon" waitlist</h2>
+    <p class="muted small">People asking to hear when a tool launches. This is a good signal for what to build next.</p>
+    <p>{% for key, n in waitlist.items() %}<span class="tag flexible" style="font-size:.9rem">{{ key }}: {{ n }}</span>{% else %}<span class="muted">No signups yet.</span>{% endfor %}</p>
+    {% if recent_waitlist %}
+    <div class="table-scroll"><table>
+      <thead><tr><th>Email</th><th>Tool</th><th>Date</th></tr></thead>
+      <tbody>{% for w in recent_waitlist %}<tr><td>{{ w.email }}</td><td>{{ w.product }}</td><td>{{ w.created_at.strftime('%d %b %Y') }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </div>
 </main>
 {% endblock %}

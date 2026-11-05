@@ -8,7 +8,8 @@
 {% block body %}
 <section class="hero">
   <div class="inner">
-    {% if trade %}<div class="eyebrow">For {{ trade.plural }}</div>{% endif %}
+    {% if not trade %}<div class="eyebrow">{{ settings.app_name }} by {{ settings.brand_name }}</div>{% endif %}
+    {% if trade %}<div class="eyebrow">{{ settings.app_name }} · for {{ trade.plural }}</div>{% endif %}
     <h1>{% if trade %}Never miss another job because you were on one.{% else %}Never miss another job because you were up a ladder.{% endif %}</h1>
     <p>An AI receptionist answers the calls you can't, in your business's name, 24/7. It takes the caller's name,
       number, address and exactly what they need, then puts it on your phone.
@@ -120,7 +121,7 @@
   <section>
     <h2>Built for your trade</h2>
     <div class="trade-links">
-      {% for t in marketing %}<a href="/for/{{ t.slug }}{{ '?country=GB' if region == 'GB' else '' }}" class="{{ 'active' if trade and trade.key == t.key }}">{{ t.label }}</a>{% endfor %}
+      {% for t in marketing %}<a href="/{{ settings.product_slug }}/for/{{ t.slug }}{{ '?country=GB' if region == 'GB' else '' }}" class="{{ 'active' if trade and trade.key == t.key }}">{{ t.label }}</a>{% endfor %}
     </div>
   </section>
 

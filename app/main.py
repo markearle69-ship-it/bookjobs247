@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (registers tables)
@@ -48,7 +48,23 @@ def service_worker():
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def manifest():
-    return FileResponse("app/static/manifest.webmanifest", media_type="application/manifest+json")
+    # Built from settings so renaming the tool renames the installed app too.
+    return JSONResponse({
+        "name": settings.app_name,
+        "short_name": settings.app_name,
+        "description": "Your 24/7 AI receptionist - never miss a job while you're working.",
+        "start_url": "/app",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#12243a",
+        "theme_color": "#12243a",
+        "icons": [
+            {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "maskable"},
+        ],
+    }, media_type="application/manifest+json")
 
 
 @app.get("/healthz", include_in_schema=False)

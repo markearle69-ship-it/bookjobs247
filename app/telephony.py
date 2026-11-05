@@ -74,7 +74,7 @@ def _buy_us_number(account: Account) -> tuple[str, str]:
             voice_method="POST",
             status_callback=settings.url("/twilio/status"),
             status_callback_method="POST",
-            friendly_name=f"BookJobs247 #{account.id} {account.business_name}"[:64],
+            friendly_name=f"{settings.app_name} #{account.id} {account.business_name}"[:64],
         )
         return bought.phone_number, bought.sid
     except TwilioRestException as exc:
@@ -96,10 +96,10 @@ def _assign_from_pool(db: Session, account: Account) -> tuple[str, str]:
         client().incoming_phone_numbers(pool.twilio_sid).update(
             voice_url=voice_webhook_url(), voice_method="POST",
             status_callback=settings.url("/twilio/status"), status_callback_method="POST",
-            friendly_name=f"BookJobs247 #{account.id} {account.business_name}"[:64],
+            friendly_name=f"{settings.app_name} #{account.id} {account.business_name}"[:64],
         )
     except TwilioRestException as exc:
-        raise ProvisioningError(f"Couldn't point pool number {pool.phone_number} at BookJobs247: {exc.msg}") from exc
+        raise ProvisioningError(f"Couldn't point pool number {pool.phone_number} at {settings.app_name}: {exc.msg}") from exc
     pool.account_id = account.id
     pool.released_at = None
     return pool.phone_number, pool.twilio_sid

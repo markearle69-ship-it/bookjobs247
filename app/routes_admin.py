@@ -12,7 +12,7 @@ from . import billing
 from .activation import ensure_number
 from .config import settings
 from .db import get_db
-from .models import Account, Call, PoolNumber, TradeTemplate, utcnow
+from .models import Account, Call, PoolNumber, TradeTemplate, WaitlistSignup, utcnow
 from .phone import normalize
 from .security import ADMIN_COOKIE, ADMIN_MAX_AGE, make_admin_session, read_admin_session
 from .telephony import POOL_COOLDOWN, ProvisioningError, lookup_owned_number
@@ -60,8 +60,12 @@ def admin_home(request: Request, msg: str = "", db: Session = Depends(get_db)):
     unreported = db.query(Call).filter(Call.kind == "agent", Call.usage_reported.is_(False),
                                        Call.duration_seconds > 0).count()
     active = sum(1 for a in accounts if a.is_active)
+    waitlist = dict(db.query(WaitlistSignup.product, func.count(WaitlistSignup.id))
+                    .group_by(WaitlistSignup.product).all())
+    recent_waitlist = db.query(WaitlistSignup).order_by(WaitlistSignup.created_at.desc()).limit(50).all()
     return render(request, "admin/home.html", accounts=accounts, minutes=minutes, calls=calls, pool=pool,
-                  pool_free=pool_free, unreported=unreported, active=active, msg=msg)
+                  pool_free=pool_free, unreported=unreported, active=active, msg=msg, waitlist=waitlist,
+                  recent_waitlist=recent_waitlist)
 
 
 @router.post("/pool")

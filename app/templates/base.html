@@ -16,7 +16,11 @@
 </head>
 <body data-vapid="{{ settings.vapid_public_key }}" data-autorefresh="{% block autorefresh %}0{% endblock %}">
   <header class="topbar">
-    <a class="logo" href="{{ '/app' if account else '/' }}">BookJobs<span>247</span></a>
+    {% if marketing_page or not account %}
+      <a class="logo" href="/">{{ brand_head }} <span>{{ brand_tail }}</span></a>
+    {% else %}
+      <a class="logo" href="/app">{{ settings.app_name }}<small class="by">by {{ brand_head }} <span>{{ brand_tail }}</span></small></a>
+    {% endif %}
     <nav class="nav">
       {% block nav %}
       {% if account %}
@@ -28,12 +32,23 @@
           <form method="post" action="/logout"><button class="linkbtn">Log out</button></form>
         {% endif %}
       {% else %}
+        {% if marketing_page %}<a href="/{{ settings.product_slug }}" class="hide-sm">{{ settings.app_name }}</a>{% endif %}
         <a href="/login">Log in</a>
       {% endif %}
       {% endblock %}
     </nav>
   </header>
   {% block body %}{% endblock %}
+  {% if marketing_page %}
+  <footer class="site-footer">
+    <div class="wrap-wide">
+      <div class="logo" style="color:#fff">{{ brand_head }} <span>{{ brand_tail }}</span></div>
+      <p>We do the admin. You stay on the tools.</p>
+      <p class="small"><a href="/{{ settings.product_slug }}">{{ settings.app_name }}</a> · <a href="/#tools">All tools</a> ·
+        <a href="/login">Log in</a>{% if settings.support_email %} · <a href="mailto:{{ settings.support_email }}">{{ settings.support_email }}</a>{% endif %}</p>
+    </div>
+  </footer>
+  {% endif %}
   <script src="/static/app.js?v=1" defer></script>
 </body>
 </html>

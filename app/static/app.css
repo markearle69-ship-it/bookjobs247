@@ -184,3 +184,17 @@ details.faq p { margin: 10px 0 0; color: var(--muted); }
   .split { grid-template-columns: 1.2fr 1fr; }
   .roi-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+.logo .by { display: block; font-size: .65rem; font-weight: 600; opacity: .75; letter-spacing: 0; margin-top: -2px; }
+.site-footer { background: var(--navy); color: #c9d4df; margin-top: 40px; padding: 24px 0 calc(24px + env(safe-area-inset-bottom)); }
+.site-footer a { color: #fff; }
+.tools-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.tool-card { display: flex; flex-direction: column; }
+.tool-card .icon { font-size: 1.8rem; }
+.tool-card .status { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.tool-card .status.live { color: var(--ok); } .tool-card .status.soon { color: var(--muted); }
+.tool-card form { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+.tool-card form input { flex: 1; min-width: 160px; }
+.tool-card.live { border: 2px solid var(--brand); }
+@media (min-width: 720px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .hide-sm { display: none; } }

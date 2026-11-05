@@ -36,7 +36,7 @@ def main():
         )
     print(f"Meter: {meter.id} ({event_name})")
 
-    product = stripe.Product.create(name="BookJobs247 AI receptionist",
+    product = stripe.Product.create(name=f"{settings.app_name} AI receptionist",
                                     description="AI call answering for missed calls")
     out = {}
     for country, plan in PLANS.items():

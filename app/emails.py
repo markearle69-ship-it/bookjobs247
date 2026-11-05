@@ -45,4 +45,4 @@ def send_email(to: str, subject: str, body: str) -> bool:
 
 def alert_admin(subject: str, body: str) -> None:
     if settings.admin_email:
-        send_email(settings.admin_email, f"[BookJobs247 admin] {subject}", body)
+        send_email(settings.admin_email, f"[{settings.app_name} admin] {subject}", body)

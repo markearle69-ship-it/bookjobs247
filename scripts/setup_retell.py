@@ -65,7 +65,7 @@ def create_llm():
 
 def agent_settings(country, gender):
     return {
-        "agent_name": f"BookJobs247 {country} {gender}",
+        "agent_name": f"{settings.app_name} {country} {gender}",
         "webhook_url": settings.url("/webhooks/retell"),
         "language": "en-GB" if country == "GB" else "en-US",
         "post_call_analysis_data": POST_CALL_ANALYSIS,

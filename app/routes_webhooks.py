@@ -42,7 +42,7 @@ def _start_voicemail(db: Session, call: Call, account: Account) -> Response:
 
 @router.post("/twilio/voice")
 async def twilio_voice(request: Request, db: Session = Depends(get_db)):
-    """A forwarded call has reached a BookJobs247 number."""
+    """A forwarded call has reached a Call Keeper number."""
     form = await _twilio_form(request)
     to_number, from_number, call_sid = form.get("To", ""), form.get("From", ""), form.get("CallSid", "")
 
