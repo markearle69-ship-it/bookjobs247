@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ call.display_name }} – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <p><a href="/app">← All calls</a></p>
+  <h1>{{ call.caller_name or (call.from_number | pretty) or 'Unknown caller' }}</h1>
+  <p class="muted">
+    {% if call.kind == 'voicemail' %}<span class="tag vm">Voicemail</span>{% endif %}
+    {% if call.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ call.urgency }}">{{ {'emergency': 'Urgent', 'soon': 'Soon', 'flexible': 'Flexible'}[call.urgency] }}</span>{% endif %}
+    <span data-ts="{{ call.created_at.isoformat() }}Z">{{ call.created_at.strftime('%d %b %Y %H:%M') }}</span>
+    {% if call.duration_seconds %}· {{ (call.duration_seconds // 60) }}m {{ call.duration_seconds % 60 }}s{% endif %}
+  </p>
+
+  <div class="actions">
+    {% if call.best_number %}
+      <a class="btn ok" href="tel:{{ call.best_number }}">📞 Call back</a>
+      <a class="btn secondary" href="sms:{{ call.best_number }}">💬 Text</a>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <dl class="details">
+      {% if call.job_description %}<dt>Job</dt><dd>{{ call.job_description }}</dd>{% endif %}
+      {% if call.caller_address %}<dt>Address / area</dt><dd>{{ call.caller_address }}</dd>{% endif %}
+      {% if call.callback_number %}<dt>Call back on</dt><dd>{{ call.callback_number | pretty }}</dd>{% endif %}
+      <dt>Called from</dt><dd>{{ (call.from_number | pretty) or 'Withheld' }}</dd>
+      {% if call.preferred_callback_time %}<dt>Best time to call</dt><dd>{{ call.preferred_callback_time }}</dd>{% endif %}
+      {% if call.summary %}<dt>Summary</dt><dd style="font-weight:400">{{ call.summary }}</dd>{% endif %}
+    </dl>
+    {% if call.status == 'in_progress' %}<p class="muted small" style="margin:12px 0 0">This call is still going on. Details appear when it ends.</p>{% endif %}
+  </div>
+
+  {% if call.recording_url %}
+  <div class="card">
+    <h3>Recording</h3>
+    <audio controls preload="none" src="/app/calls/{{ call.id }}/recording"></audio>
+  </div>
+  {% endif %}
+
+  {% if call.transcript and call.kind == 'agent' %}
+  <div class="card">
+    <h3>Transcript</h3>
+    <div class="transcript">{{ call.transcript }}</div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/app/calls/{{ call.id }}/handled">
+    {% if call.handled %}
+      <input type="hidden" name="handled" value="0">
+      <button class="btn secondary block">Move back to "To call back"</button>
+    {% else %}
+      <input type="hidden" name="handled" value="1">
+      <button class="btn block">✓ Done, I've called them back</button>
+    {% endif %}
+  </form>
+</main>
+<script>
+  document.querySelectorAll("[data-ts]").forEach(function (el) {
+    var d = new Date(el.getAttribute("data-ts"));
+    if (!isNaN(d)) el.textContent = d.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  });
+</script>
+{% endblock %}

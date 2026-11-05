@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ settings.app_name }} – never miss a job while you're working{% endblock %}
+{% block body %}
+<section class="hero">
+  <div class="inner">
+    <h1>Never miss another job because you were up a ladder.</h1>
+    <p>{{ settings.app_name }} gives you an AI receptionist that answers the calls you can't. It takes the caller's
+      name, number, address and what they need, then sends it straight to your phone.</p>
+    <a class="btn" href="/signup">Get started</a>
+    {% if account %}<a class="btn secondary" style="color:#fff;border-color:#3a4d63;margin-left:8px" href="/app">Open my calls</a>{% endif %}
+  </div>
+</section>
+<main class="wrap-wide">
+  <h2 style="margin-top:24px">How it works</h2>
+  <div class="features">
+    <div class="card"><h3>1. Forward missed calls</h3><p class="muted">Takes 30 seconds. Your phone still rings
+      first, and only calls you don't pick up come to us. We give you one-tap set-up buttons.</p></div>
+    <div class="card"><h3>2. Your assistant answers</h3><p class="muted">A friendly, natural-sounding voice answers
+      in your business's name and takes a proper message: who, where, what the job is and how urgent it is.</p></div>
+    <div class="card"><h3>3. Call them back</h3><p class="muted">You get a notification with the job details.
+      Finish your job, open the app, and tap to call them back.</p></div>
+  </div>
+  <div class="card">
+    <h3>On or off with one tap</h3>
+    <p class="muted" style="margin:0">Want calls to go to voicemail instead? Flick the switch in the app. When the
+      assistant is off, voicemails still come to the app with a transcript.</p>
+  </div>
+
+  <h2 style="margin-top:24px">Simple pricing</h2>
+  <div class="pricing">
+    {% for label, country, p in [("US", "US", us), ("UK", "GB", gb)] %}
+    <div class="card">
+      <div class="muted small">{{ label }}</div>
+      <div class="price">{{ p.monthly_label }}<small>/month</small></div>
+      <p>Includes {{ p.included_minutes }} minutes of answered calls, then {{ p.overage_label }} a minute.
+        Voicemail is always free. No contract, cancel any time.</p>
+      <a class="btn block" href="/signup?country={{ country }}">Start ({{ label }})</a>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted small" style="margin-top:16px">A typical message-taking call lasts 1–2 minutes, so 30 minutes is
+    roughly 15–30 calls.</p>
+</main>
+{% endblock %}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="{{ 'en-GB' if account and account.country == 'GB' else 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
+  <meta name="theme-color" content="#12243a">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ settings.app_name }}">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/static/app.css?v=1">
+</head>
+<body data-vapid="{{ settings.vapid_public_key }}" data-autorefresh="{% block autorefresh %}0{% endblock %}">
+  <header class="topbar">
+    <a class="logo" href="{{ '/app' if account else '/' }}">BookJobs<span>247</span></a>
+    <nav class="nav">
+      {% block nav %}
+      {% if account %}
+        {% if account.onboarding_complete and account.is_active %}
+          <a href="/app">Calls</a>
+          <a href="/app/setup">Setup</a>
+          <a href="/app/settings">Settings</a>
+        {% else %}
+          <form method="post" action="/logout"><button class="linkbtn">Log out</button></form>
+        {% endif %}
+      {% else %}
+        <a href="/login">Log in</a>
+      {% endif %}
+      {% endblock %}
+    </nav>
+  </header>
+  {% block body %}{% endblock %}
+  <script src="/static/app.js?v=1" defer></script>
+</body>
+</html>

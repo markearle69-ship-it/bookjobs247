@@ -1,0 +1,30 @@
+<label for="business_name">Business name</label>
+<input id="business_name" name="business_name" maxlength="200" value="{{ account.business_name }}" required>
+
+<label for="owner_name">Your first name <span class="hint">– the assistant says "{name} is out on a job"</span></label>
+<input id="owner_name" name="owner_name" maxlength="120" value="{{ account.owner_name }}" required autocomplete="given-name">
+
+<label for="trade">Your trade</label>
+<input id="trade" name="trade" maxlength="120" value="{{ account.trade }}" required
+       placeholder="e.g. plumber, electrician, roofer, cleaner" list="trades">
+<datalist id="trades">
+  {% for t in ["plumber", "electrician", "heating engineer", "roofer", "builder", "carpenter", "painter and decorator",
+               "landscaper", "locksmith", "cleaner", "HVAC technician", "handyman", "pest control", "garage door repair"] %}
+  <option value="{{ t }}">{% endfor %}
+</datalist>
+
+<label for="services">What jobs do you do? <span class="hint">– helps the assistant understand callers</span></label>
+<textarea id="services" name="services" maxlength="2000"
+          placeholder="e.g. Boiler repairs and servicing, leaks, bathroom fitting, emergency call-outs">{{ account.services }}</textarea>
+
+<label for="service_area">Area you cover</label>
+<input id="service_area" name="service_area" maxlength="255" value="{{ account.service_area }}"
+       placeholder="{{ 'e.g. Leeds and 15 miles around' if account.country == 'GB' else 'e.g. Austin and surrounding suburbs' }}">
+
+<label for="business_hours">Usual working hours</label>
+<input id="business_hours" name="business_hours" maxlength="255" value="{{ account.business_hours }}"
+       placeholder="e.g. Mon–Fri 8am–6pm, Sat mornings">
+
+<label for="owner_phone">Your mobile / business number <span class="hint">– the phone you'll forward from</span></label>
+<input id="owner_phone" name="owner_phone" type="tel" required value="{{ account.owner_phone | pretty }}" autocomplete="tel"
+       placeholder="{{ '07700 900123' if account.country == 'GB' else '(555) 123-4567' }}">

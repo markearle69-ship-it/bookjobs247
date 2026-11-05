@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Set up forwarding – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  {% if not account.first_call_at %}<p class="muted small">Step 3 of 3</p>{% endif %}
+  <h1>Forward your missed calls</h1>
+
+  {% if not account.twilio_number %}
+    <div class="card">
+      {% if account.provisioning_error %}
+        <h2>We're getting your number ready</h2>
+        <p class="muted">This is taking a little longer than usual. We've been alerted and will email you as soon
+          as it's ready, usually within a few hours. You don't need to do anything.</p>
+      {% elif not account.is_active %}
+        <h2>Waiting for payment to confirm…</h2>
+        <p class="muted">This usually takes a few seconds.</p>
+        <a class="btn secondary" href="/app/setup">Refresh</a>
+      {% else %}
+        <h2>Setting up your number…</h2>
+        <a class="btn secondary" href="/app/setup">Refresh</a>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="card">
+      <div class="muted small">Your {{ settings.app_name }} number</div>
+      <div class="bignum">{{ account.twilio_number | pretty }}</div>
+      {% if account.first_call_at %}
+        <div class="success" style="margin:10px 0 0">✅ Forwarding is working. We received your first call
+          on {{ account.first_call_at.strftime('%d %b %Y') }}.</div>
+      {% endif %}
+    </div>
+
+    <ol class="steps">
+      <li>
+        <h3>Turn on forwarding for missed calls</h3>
+        <p class="muted">Pick your network and tap the green button <strong>on the phone customers call you on</strong>.
+          Your dialer opens with the code filled in. Just press call. Your phone still rings as normal;
+          only calls you don't answer, are busy for, or get when you have no signal come to your assistant.</p>
+        {% for c in codes %}
+        <details class="carrier" {% if loop.first %}open{% endif %}>
+          <summary>{{ c.label }}</summary>
+          <p style="margin-top:10px"><a class="btn ok" href="{{ c.on_href }}">Turn on forwarding</a></p>
+          <p class="small muted">Or dial: <span class="code">{{ c.on_code }}</span></p>
+          {% if c.note %}<p class="small muted">{{ c.note }}</p>{% endif %}
+          <p class="small muted">To stop forwarding completely later, dial <a href="{{ c.off_href }}"><span class="code">{{ c.off_code }}</span></a></p>
+        </details>
+        {% endfor %}
+      </li>
+      <li>
+        <h3>Test it</h3>
+        <p class="muted">Ask someone to ring your number (or use another phone) and don't answer. Your assistant
+          should pick up. The call then appears in your <a href="/app">Calls</a> list.</p>
+      </li>
+      <li>
+        <h3>Add the app to your home screen</h3>
+        <p class="muted"><strong>iPhone:</strong> in Safari tap the Share button, then <em>Add to Home Screen</em>.
+          <br><strong>Android:</strong> in Chrome tap ⋮, then <em>Add to Home screen</em> or <em>Install app</em>.</p>
+        <p class="muted">Open it from your home screen and turn on notifications so you know about every call.</p>
+      </li>
+    </ol>
+    <a class="btn block" href="/app">Go to my calls</a>
+    <p class="muted small" style="margin-top:14px">Tip: you don't need to touch the forwarding again. To stop the
+      assistant answering, use the ON/OFF switch on your Calls screen. Missed calls then go to voicemail instead.</p>
+  {% endif %}
+</main>
+{% endblock %}

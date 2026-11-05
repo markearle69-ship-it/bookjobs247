@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Admin – {{ settings.app_name }}{% endblock %}
+{% block nav %}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <h1>Admin</h1>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/admin/login" class="card">
+    <label for="password">Admin password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password">
+    <p></p>
+    <button class="btn block">Log in</button>
+  </form>
+</main>
+{% endblock %}

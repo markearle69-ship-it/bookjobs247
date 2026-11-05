@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}About your business – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <p class="muted small">Step 1 of 3</p>
+  <h1>About your business</h1>
+  <p class="muted">Your assistant uses this to answer calls in your name. You can change it any time.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/app/onboarding" class="card">
+    {% include "_business_fields.html" %}
+    {% if account.country == 'US' %}
+    <label for="area_code">Preferred area code for your new number <span class="hint">(optional)</span></label>
+    <input id="area_code" name="area_code" inputmode="numeric" maxlength="3" value="{{ account.area_code }}" placeholder="e.g. 512">
+    {% endif %}
+    <p></p>
+    <button class="btn block">Continue</button>
+  </form>
+</main>
+{% endblock %}

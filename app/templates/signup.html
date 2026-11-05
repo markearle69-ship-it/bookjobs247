@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Sign up – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <h1>Create your account</h1>
+  <p class="muted">Takes about 3 minutes. Your number is ready as soon as you've paid.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/signup" class="card">
+    <label for="business_name">Business name</label>
+    <input id="business_name" name="business_name" required maxlength="200" value="{{ form.business_name or '' }}"
+           placeholder="e.g. Smith Plumbing & Heating" autocomplete="organization">
+    <label for="country">Where's your business?</label>
+    <select id="country" name="country">
+      <option value="US" {% if form.country != 'GB' %}selected{% endif %}>United States</option>
+      <option value="GB" {% if form.country == 'GB' %}selected{% endif %}>United Kingdom</option>
+    </select>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required value="{{ form.email or '' }}" autocomplete="email">
+    <label for="password">Password <span class="hint">(8+ characters)</span></label>
+    <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+    <p></p>
+    <button class="btn block">Continue</button>
+  </form>
+  <p class="muted">Already have an account? <a href="/login">Log in</a></p>
+</main>
+{% endblock %}

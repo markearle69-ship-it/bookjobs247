@@ -1,0 +1,161 @@
+from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .db import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+ACTIVE_STATUSES = {"active", "trialing"}
+
+
+class Account(Base):
+    """One business owner = one account = one forwarding number."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    # "US" or "GB" - decides currency, agent voice, and where the number comes from.
+    country: Mapped[str] = mapped_column(String(2), default="US")
+
+    # Business details, fed to the voice agent on every call.
+    business_name: Mapped[str] = mapped_column(String(200))
+    owner_name: Mapped[str] = mapped_column(String(120), default="")
+    trade: Mapped[str] = mapped_column(String(120), default="")
+    services: Mapped[str] = mapped_column(Text, default="")
+    service_area: Mapped[str] = mapped_column(String(255), default="")
+    business_hours: Mapped[str] = mapped_column(String(255), default="")
+    # The phone the owner forwards FROM (their mobile/business number).
+    owner_phone: Mapped[str] = mapped_column(String(32), default="")
+    # US only: preferred area code for their new number.
+    area_code: Mapped[str] = mapped_column(String(3), default="")
+    onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # The ON/OFF switch. ON = AI agent answers, OFF = plain voicemail.
+    agent_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Their BookJobs247 number, which their phone forwards missed calls to.
+    twilio_number: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
+    twilio_number_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provisioning_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set the first time a call reaches their number, i.e. forwarding works.
+    first_call_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Billing.
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    subscription_status: Mapped[str] = mapped_column(String(32), default="none")
+    current_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    calls: Mapped[list["Call"]] = relationship(back_populates="account", order_by="Call.created_at.desc()")
+    push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
+
+    @property
+    def is_active(self) -> bool:
+        return self.subscription_status in ACTIVE_STATUSES
+
+    @property
+    def currency(self) -> str:
+        return "gbp" if self.country == "GB" else "usd"
+
+
+class Call(Base):
+    """A call that reached the owner's BookJobs247 number - answered by the
+    AI agent (kind="agent") or by voicemail (kind="voicemail")."""
+
+    __tablename__ = "calls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # "agent" | "voicemail"
+    status: Mapped[str] = mapped_column(String(16), default="in_progress")  # "in_progress" | "complete"
+
+    twilio_call_sid: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    retell_call_id: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
+    from_number: Mapped[str] = mapped_column(String(32), default="")
+
+    # Details collected by the agent (or the voicemail transcript).
+    caller_name: Mapped[str] = mapped_column(String(200), default="")
+    callback_number: Mapped[str] = mapped_column(String(32), default="")
+    caller_address: Mapped[str] = mapped_column(String(500), default="")
+    job_description: Mapped[str] = mapped_column(Text, default="")
+    urgency: Mapped[str] = mapped_column(String(32), default="")  # emergency | soon | flexible
+    preferred_callback_time: Mapped[str] = mapped_column(String(200), default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    transcript: Mapped[str] = mapped_column(Text, default="")
+    recording_url: Mapped[str] = mapped_column(String(1000), default="")
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Billing: whole minutes reported to Stripe's meter for this call.
+    billed_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    usage_reported: Mapped[bool] = mapped_column(Boolean, default=False)
+    notified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Owner workflow.
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    handled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    account: Mapped[Account] = relationship(back_populates="calls")
+
+    @property
+    def display_name(self) -> str:
+        return self.caller_name or self.from_number or "Unknown caller"
+
+    @property
+    def best_number(self) -> str:
+        return self.callback_number or self.from_number
+
+
+class PushSubscription(Base):
+    """A browser/phone that asked for push notifications (one per device)."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(1000), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    account: Mapped[Account] = relationship(back_populates="push_subscriptions")
+
+
+class PoolNumber(Base):
+    """A UK number you bought in advance under your own Twilio regulatory
+    bundle. UK signups are assigned one instantly instead of waiting days
+    for per-customer bundle approval."""
+
+    __tablename__ = "pool_numbers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phone_number: Mapped[str] = mapped_column(String(32), unique=True)
+    twilio_sid: Mapped[str] = mapped_column(String(64))
+    country: Mapped[str] = mapped_column(String(2), default="GB")
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"), nullable=True)
+    # When a cancelled customer's number came back. It isn't handed out
+    # again until a cooldown passes, so old forwarding doesn't reach a new
+    # business.
+    released_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ProcessedStripeEvent(Base):
+    """Stripe retries webhooks, so each event id is processed once."""
+
+    __tablename__ = "processed_stripe_events"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

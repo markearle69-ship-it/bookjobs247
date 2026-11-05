@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Admin – {{ settings.app_name }}{% endblock %}
+{% block nav %}<span class="small">Admin</span>{% endblock %}
+{% block body %}
+<main class="wrap-wide">
+  {% if msg %}<div class="notice">{{ msg }}</div>{% endif %}
+  <div class="stats">
+    <div class="stat"><div class="n">{{ active }}</div><div class="l">Paying customers</div></div>
+    <div class="stat"><div class="n">{{ accounts | length }}</div><div class="l">Signups</div></div>
+    <div class="stat"><div class="n">{{ pool_free }}</div><div class="l">UK numbers free</div></div>
+    <div class="stat"><div class="n">{{ unreported }}</div><div class="l">Calls with unbilled minutes</div></div>
+  </div>
+  {% if pool_free < 3 %}<div class="notice">Your UK number pool is low. Buy more UK numbers in Twilio under your regulatory bundle and add them below.</div>{% endif %}
+  {% if unreported %}
+    <form method="post" action="/admin/usage/retry" class="card"><p class="muted small">{{ unreported }} call(s) haven't been sent to Stripe's meter yet (Stripe was unreachable).</p>
+      <button class="btn small">Retry billing usage</button></form>
+  {% endif %}
+
+  <div class="card">
+    <h2>Customers</h2>
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Business</th><th>Country</th><th>Status</th><th>Number</th><th>Assistant</th><th>Calls / mins (30d)</th><th>Forwarding</th><th></th></tr></thead>
+      <tbody>
+      {% for a in accounts %}
+        <tr>
+          <td><strong>{{ a.business_name }}</strong><br><span class="muted small">{{ a.email }}<br>{{ a.trade }}</span></td>
+          <td>{{ a.country }}</td>
+          <td>{{ a.subscription_status }}{% if not a.onboarding_complete %}<br><span class="muted small">onboarding</span>{% endif %}</td>
+          <td>{{ a.twilio_number | pretty if a.twilio_number else '–' }}
+            {% if a.provisioning_error %}<br><span class="small" style="color:var(--danger)">{{ a.provisioning_error }}</span>{% endif %}</td>
+          <td>{{ 'ON' if a.agent_enabled else 'OFF' }}</td>
+          <td>{{ calls.get(a.id, 0) }} / {{ minutes.get(a.id) or 0 }}</td>
+          <td>{{ 'working' if a.first_call_at else 'not yet' }}</td>
+          <td>{% if a.is_active and not a.twilio_number %}
+            <form method="post" action="/admin/accounts/{{ a.id }}/retry"><button class="btn small">Retry number</button></form>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="muted">No signups yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>UK number pool</h2>
+    <p class="muted small">Buy UK numbers in Twilio under your approved regulatory bundle, then add them here. New UK
+      customers get one instantly. Numbers from cancelled customers come back after a 30-day cooldown.</p>
+    <form method="post" action="/admin/pool" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input name="phone_number" placeholder="+44 7700 900123" required style="flex:1;min-width:200px">
+      <button class="btn">Add number</button>
+    </form>
+    <div class="table-scroll" style="margin-top:12px">
+    <table>
+      <thead><tr><th>Number</th><th>Assigned to</th><th>Released</th></tr></thead>
+      <tbody>
+      {% for p in pool %}
+        <tr><td>{{ p.phone_number | pretty }}</td><td>{{ ('#' ~ p.account_id) if p.account_id else 'free' }}</td>
+          <td>{{ p.released_at.strftime('%d %b %Y') if p.released_at else '' }}</td></tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">Empty.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</main>
+{% endblock %}

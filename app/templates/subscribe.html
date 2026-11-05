@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Start your plan – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <p class="muted small">Step 2 of 3</p>
+  <h1>Start your plan</h1>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  {% if account.subscription_status == 'canceled' %}
+    <div class="notice">Your previous plan has ended. Restart it below to get a number again.</div>
+  {% endif %}
+  <div class="card">
+    <div class="price">{{ plan.monthly_label }}<small>/month</small></div>
+    <ul>
+      <li>Your own {{ 'UK' if account.country == 'GB' else 'US' }} number for missed calls</li>
+      <li>AI assistant answers 24/7 and takes the full job details</li>
+      <li>{{ plan.included_minutes }} answered minutes included, then {{ plan.overage_label }}/minute</li>
+      <li>Free voicemail with transcripts when the assistant is switched off</li>
+      <li>Instant notifications on your phone</li>
+      <li>No contract. Cancel any time from Settings.</li>
+    </ul>
+    <form method="post" action="/billing/checkout">
+      <button class="btn block">Continue to secure payment</button>
+    </form>
+    <p class="muted small" style="margin-top:10px">Payments are handled by Stripe. We never see your card details.</p>
+  </div>
+</main>
+{% endblock %}

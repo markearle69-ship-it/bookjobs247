@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{% if unread %}({{ unread }}) {% endif %}Calls – {{ settings.app_name }}{% endblock %}
+{% block autorefresh %}1{% endblock %}
+{% block body %}
+<main class="wrap">
+  {% if account.subscription_status in ('past_due', 'unpaid') %}
+    <div class="notice">Your last payment didn't go through, so calls are going to voicemail.
+      <form class="inline" method="post" action="/billing/portal"><button class="linkbtn" style="color:inherit;text-decoration:underline">Update your card</button></form>
+      to turn your assistant back on.</div>
+  {% endif %}
+  {% if not account.twilio_number %}
+    <div class="notice">Your number isn't ready yet. <a href="/app/setup">See setup</a></div>
+  {% elif not account.first_call_at %}
+    <div class="notice">Finish setting up: forward your missed calls to {{ account.twilio_number | pretty }}.
+      <a href="/app/setup">Show me how</a></div>
+  {% endif %}
+
+  <div class="card switch-card">
+    <div>
+      <div id="agent-state" class="state {{ 'on' if account.agent_enabled else 'off' }}">Assistant {{ 'ON' if account.agent_enabled else 'OFF' }}</div>
+      <div id="agent-desc" class="muted small">
+        {% if account.agent_enabled %}Missed calls are answered by your AI assistant, which takes the full job details.
+        {% else %}Missed calls go to a simple voicemail. Turn on to have your assistant answer.{% endif %}
+      </div>
+    </div>
+    <label class="switch" aria-label="Assistant on or off" style="margin:0">
+      <input type="checkbox" id="agent-toggle" {% if account.agent_enabled %}checked{% endif %}>
+      <span class="track"></span>
+    </label>
+  </div>
+
+  <div id="push-card" class="card hidden">
+    <div id="push-enable" class="hidden">
+      <h3>Get notified about new calls</h3>
+      <p class="muted small">So you know about a new job the moment the assistant has the details.</p>
+      <button id="push-enable-btn" class="btn block">Turn on notifications</button>
+    </div>
+    <div id="push-ios" class="hidden">
+      <h3>Get notified about new calls</h3>
+      <p class="muted small">On iPhone, notifications only work from the home-screen app: tap Share,
+        then <em>Add to Home Screen</em>, then open {{ settings.app_name }} from there.</p>
+    </div>
+    <div id="push-denied" class="hidden">
+      <h3>Notifications are blocked</h3>
+      <p class="muted small">Allow notifications for {{ settings.app_name }} in your phone's settings to be told about new calls.</p>
+    </div>
+    <div id="push-unsupported" class="hidden">
+      <p class="muted small" style="margin:0">This browser can't show notifications. Add the app to your home screen,
+        or check back here after each job.</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">{{ unread }}</div><div class="l">New</div></div>
+    <div class="stat"><div class="n">{{ minutes_used }}<span class="muted small"> / {{ plan.included_minutes }}</span></div><div class="l">Minutes this month</div></div>
+  </div>
+  {% if overage %}
+    <p class="muted small">{{ overage }} extra minute{{ 's' if overage != 1 }} this month at {{ plan.overage_label }} each.</p>
+  {% endif %}
+
+  <div class="tabs">
+    <a href="/app?show=open" class="{{ 'active' if show == 'open' }}">To call back</a>
+    <a href="/app?show=all" class="{{ 'active' if show == 'all' }}">All calls</a>
+  </div>
+
+  {% if calls %}
+  <ul class="calls">
+    {% for c in calls %}
+    <li>
+      <a href="/app/calls/{{ c.id }}" class="{{ 'unread' if not c.is_read }}">
+        <div class="row">
+          <span class="who">{{ c.display_name if c.caller_name else (c.from_number | pretty) or 'Unknown caller' }}</span>
+          <span class="when" data-ts="{{ c.created_at.isoformat() }}Z">{{ c.created_at.strftime('%d %b %H:%M') }}</span>
+        </div>
+        <div class="what">
+          {% if c.kind == 'voicemail' %}<span class="tag vm">Voicemail</span>{% endif %}
+          {% if c.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ c.urgency }}">{{ {'emergency': 'Urgent', 'soon': 'Soon', 'flexible': 'Flexible'}[c.urgency] }}</span>{% endif %}
+          {% if c.status == 'in_progress' %}On the call now…{% else %}{{ c.job_description or c.summary or 'No details' }}{% endif %}
+        </div>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    <div class="empty">
+      {% if show == 'open' %}Nothing to call back. 👍{% else %}No calls yet. They'll appear here as soon as they come in.{% endif %}
+    </div>
+  {% endif %}
+</main>
+<script>
+  // Show times in the phone's own timezone.
+  document.querySelectorAll("[data-ts]").forEach(function (el) {
+    var d = new Date(el.getAttribute("data-ts"));
+    if (!isNaN(d)) {
+      var today = new Date().toDateString() === d.toDateString();
+      el.textContent = today ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                             : d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " +
+                               d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+  });
+</script>
+{% endblock %}

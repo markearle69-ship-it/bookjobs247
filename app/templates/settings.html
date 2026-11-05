@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Settings – {{ settings.app_name }}{% endblock %}
+{% block body %}
+<main class="wrap">
+  <h1>Settings</h1>
+  {% if saved %}<div class="success">Saved. Your assistant will use this from the next call.</div>{% endif %}
+
+  <form method="post" action="/app/settings" class="card">
+    <h2>Your business</h2>
+    {% include "_business_fields.html" %}
+    <p></p>
+    <button class="btn block">Save</button>
+  </form>
+
+  <div class="card">
+    <h2>Plan & billing</h2>
+    {% set p = plan_for(account.country) %}
+    <p class="muted">{{ p.monthly_label }}/month · {{ p.included_minutes }} minutes included · {{ p.overage_label }}/extra minute.
+      {% if account.current_period_end %}<br>Renews {{ account.current_period_end.strftime('%d %b %Y') }}.{% endif %}</p>
+    <p class="muted">Your number: <strong>{{ account.twilio_number | pretty if account.twilio_number else 'not assigned yet' }}</strong></p>
+    <form method="post" action="/billing/portal">
+      <button class="btn secondary block">Manage payment, invoices or cancel</button>
+    </form>
+    <p class="muted small" style="margin-top:10px">If you cancel, remember to turn off call forwarding on your phone.
+      Codes are on the <a href="/app/setup">Setup</a> page.</p>
+  </div>
+
+  <div class="card">
+    <h2>Account</h2>
+    <p class="muted">Logged in as {{ account.email }}</p>
+    <form method="post" action="/logout"><button class="btn secondary block">Log out</button></form>
+  </div>
+</main>
+{% endblock %}
