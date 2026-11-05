@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Trade scripts – Admin{% endblock %}
+{% block nav %}<a href="/admin">Customers</a><a href="/admin/trades">Trade scripts</a>{% endblock %}
+{% block body %}
+<main class="wrap-wide">
+  {% if msg %}<div class="notice">{{ msg }}</div>{% endif %}
+  <h1>Trade scripts</h1>
+  <p class="muted">What the assistant asks for each type of business, and what counts as an emergency there.
+    Changes apply to the <strong>next call</strong> for every customer in that trade. You don't need to redeploy or
+    re-run any script. Write the questions as a short bulleted list. You can use <span class="code">{{ '{{emergency_number}}' }}</span>
+    and <span class="code">{{ '{{gas_emergency}}' }}</span>; they're filled in with the right UK or US number.</p>
+
+  {% for t in trades %}
+  <form method="post" action="/admin/trades" class="card" id="t-{{ t.key }}">
+    <input type="hidden" name="key" value="{{ t.key }}">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+      <h2 style="margin:0">{{ t.label }}</h2>
+      <span class="muted small">{{ in_use.get(t.key, 0) }} customer(s) · key <span class="code">{{ t.key }}</span></span>
+    </div>
+    <div class="actions" style="margin:0">
+      <div><label>Label</label><input name="label" value="{{ t.label }}" required></div>
+      <div><label>Group</label><input name="group" value="{{ t.group }}"></div>
+    </div>
+    <label>Questions to ask</label>
+    <textarea name="questions" rows="5">{{ t.questions }}</textarea>
+    <label>What counts as an emergency (and any safety instruction)</label>
+    <textarea name="emergency" rows="3">{{ t.emergency }}</textarea>
+    <label class="radio" style="display:flex;gap:8px;align-items:center;font-weight:600;margin-top:12px">
+      <input type="checkbox" name="active" value="1" style="width:20px;min-height:0" {% if t.active %}checked{% endif %}>
+      Show in the signup dropdown</label>
+    <p></p>
+    <button class="btn small">Save {{ t.label }}</button>
+  </form>
+  {% endfor %}
+
+  <form method="post" action="/admin/trades" class="card">
+    <h2>Add a trade</h2>
+    <div class="actions" style="margin:0">
+      <div><label>Key <span class="hint">(e.g. window_cleaner)</span></label><input name="key" required></div>
+      <div><label>Label</label><input name="label" required placeholder="Window cleaner"></div>
+    </div>
+    <label>Group</label><input name="group" placeholder="Emergency & home services">
+    <label>Questions to ask</label><textarea name="questions" rows="4"></textarea>
+    <label>What counts as an emergency</label><textarea name="emergency" rows="2"></textarea>
+    <input type="hidden" name="active" value="1">
+    <p></p>
+    <button class="btn small">Add trade</button>
+  </form>
+</main>
+{% endblock %}

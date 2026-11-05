@@ -14,6 +14,11 @@ self.addEventListener("push", function (event) {
     tag: data.url || "call",
     renotify: true
   };
+  if (data.urgent) {
+    // Stays on screen until tapped, with a long buzz pattern.
+    options.requireInteraction = true;
+    options.vibrate = [400, 150, 400, 150, 400, 150, 800];
+  }
   event.waitUntil(Promise.all([
     self.registration.showNotification(title, options),
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clients) {

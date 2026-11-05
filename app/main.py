@@ -6,10 +6,11 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (registers tables)
 from .config import settings
-from .db import Base, engine
+from .db import Base, SessionLocal, engine
 from .routes_admin import router as admin_router
 from .routes_app import router as app_router
 from .routes_webhooks import router as webhooks_router
+from .trades import seed_trades
 from .web import LoginRequired, RedirectTo
 
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +19,8 @@ if not settings.secret_key:
     raise RuntimeError("SECRET_KEY must be set (any long random string)")
 
 Base.metadata.create_all(bind=engine)
+with SessionLocal() as _db:
+    seed_trades(_db)
 
 app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

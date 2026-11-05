@@ -1,10 +1,13 @@
-"""Create (or update) the two shared Retell agents: one US voice, one UK voice.
+"""Create (or update) the four shared Retell agents: US/UK accent x female/male voice.
 
     python scripts/setup_retell.py --list-voices
-    python scripts/setup_retell.py --voice-us <voice_id> --voice-gb <voice_id>
-        -> prints RETELL_AGENT_ID_US / RETELL_AGENT_ID_GB to put in your env
+    python scripts/setup_retell.py --us-female <id> --us-male <id> --gb-female <id> --gb-male <id>
+        -> prints the four RETELL_AGENT_ID_* values to put in your env
 
-After editing app/agent_prompt.py, push the new script to both agents:
+Customers only choose "female" or "male"; you choose the actual voices here.
+Per-trade questions live in /admin/trades and never need this script.
+
+After editing app/agent_prompt.py, push the new script to all agents:
 
     python scripts/setup_retell.py --update
 
@@ -52,13 +55,17 @@ def create_llm():
         "general_tools": [END_CALL_TOOL],
         # Fallbacks so a test call from the Retell dashboard still makes sense.
         "default_dynamic_variables": {v: "" for v in DYNAMIC_VARIABLES} | {
-            "business_name": "Test Plumbing", "owner_name": "Sam", "trade": "plumber"},
+            "greeting": "Hi, thanks for calling Test Plumbing. Sam is out on a job right now, so I'm taking "
+                        "messages. What can we help you with?",
+            "answer_as": "Test Plumbing", "owner_name": "Sam", "trade": "plumber",
+            "trade_questions": "- What the problem is and where in the property.",
+            "emergency_signs": "Water actively leaking.", "emergency_number": "911"},
     })["llm_id"]
 
 
-def agent_settings(country):
+def agent_settings(country, gender):
     return {
-        "agent_name": f"BookJobs247 {country}",
+        "agent_name": f"BookJobs247 {country} {gender}",
         "webhook_url": settings.url("/webhooks/retell"),
         "language": "en-GB" if country == "GB" else "en-US",
         "post_call_analysis_data": POST_CALL_ANALYSIS,
@@ -74,32 +81,39 @@ def publish(agent_id):
         sys.exit(f"publish-agent failed: {resp.status_code} {resp.text}")
 
 
-def create(country, voice_id):
+def create(country, gender, voice_id):
     llm_id = create_llm()
     agent = call("POST", "/create-agent", json={
         "voice_id": voice_id,
         "response_engine": {"type": "retell-llm", "llm_id": llm_id},
-        **agent_settings(country),
+        **agent_settings(country, gender),
     })
     publish(agent["agent_id"])
     return agent["agent_id"]
 
 
-def update(country, agent_id):
+def update(country, gender, agent_id):
     llm_id = create_llm()
     call("PATCH", f"/update-agent/{agent_id}", json={
         "response_engine": {"type": "retell-llm", "llm_id": llm_id},
-        **agent_settings(country),
+        **agent_settings(country, gender),
     })
     publish(agent_id)
-    print(f"{country}: agent {agent_id} now uses LLM {llm_id}")
+    print(f"{country} {gender}: agent {agent_id} now uses LLM {llm_id}")
+
+
+AGENTS = [("US", "female"), ("US", "male"), ("GB", "female"), ("GB", "male")]
+
+
+def env_name(country, gender):
+    return f"RETELL_AGENT_ID_{country}_{gender.upper()}"
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--list-voices", action="store_true")
-    p.add_argument("--voice-us")
-    p.add_argument("--voice-gb")
+    for country, gender in AGENTS:
+        p.add_argument(f"--{country.lower()}-{gender}")
     p.add_argument("--update", action="store_true")
     args = p.parse_args()
 
@@ -109,22 +123,26 @@ def main():
         return
 
     if args.update:
-        for country, agent_id in (("US", settings.retell_agent_id_us), ("GB", settings.retell_agent_id_gb)):
+        for country, gender in AGENTS:
+            agent_id = getattr(settings, env_name(country, gender).lower())
             if agent_id:
-                update(country, agent_id)
+                update(country, gender, agent_id)
         return
 
-    if not (args.voice_us and args.voice_gb):
-        sys.exit("Pass --voice-us and --voice-gb (see --list-voices), or --update")
+    chosen = {(c, g): getattr(args, f"{c.lower()}_{g}") for c, g in AGENTS}
+    if not any(chosen.values()):
+        sys.exit("Pass --us-female/--us-male/--gb-female/--gb-male voice ids (see --list-voices), or --update")
     voices = {v["voice_id"] for v in call("GET", "/list-voices")}
-    for v in (args.voice_us, args.voice_gb):
+    for v in filter(None, chosen.values()):
         if v not in voices:
             sys.exit(f"Voice id {v!r} not found (ids are case-sensitive) - see --list-voices")
-    us = create("US", args.voice_us)
-    gb = create("GB", args.voice_gb)
+    lines = []
+    for (country, gender), voice in chosen.items():
+        if voice:
+            lines.append(f"{env_name(country, gender)}={create(country, gender, voice)}")
     print("\nAdd these to your environment:\n")
-    print(f"RETELL_AGENT_ID_US={us}")
-    print(f"RETELL_AGENT_ID_GB={gb}")
+    print("\n".join(lines))
+    print("\n(A missing male voice falls back to the female agent for that country.)")
 
 
 if __name__ == "__main__":

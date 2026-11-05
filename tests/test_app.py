@@ -10,13 +10,68 @@ def test_signup_onboarding_then_subscribe(client, db):
     assert r.headers["location"] == "/app/onboarding"
     assert client.get("/app", follow_redirects=False).headers["location"] == "/app/onboarding"
     r = client.post("/app/onboarding", data={"business_name": "Spark Electric", "owner_name": "Dave",
-                                             "trade": "electrician", "owner_phone": "07700 900123"},
+                                             "trade_key": "electrician", "owner_phone": "07700 900123",
+                                             "answer_as": "Spark", "assistant_name": "Amy", "voice_gender": "male"},
                     follow_redirects=False)
     assert r.headers["location"] == "/app/subscribe"
     account = db.query(Account).one()
     assert account.email == "new@example.com" and account.owner_phone == "+447700900123"
+    assert (account.trade_key, account.trade, account.answer_as, account.assistant_name, account.voice_gender) == \
+        ("electrician", "Electrician", "Spark", "Amy", "male")
     page = client.get("/app/subscribe")
-    assert "£15" in page.text and "£0.20" in page.text
+    assert "£25" in page.text and "£0.20" in page.text and "60 answered minutes" in page.text
+
+
+def test_us_onboarding_requires_area_code(client, db):
+    client.post("/signup", data={"email": "a@b.com", "password": "password1", "business_name": "Cool Air",
+                                 "country": "US"})
+    data = {"owner_name": "Al", "trade_key": "hvac", "owner_phone": "5551234567"}
+    r = client.post("/app/onboarding", data=data, follow_redirects=False)
+    assert r.status_code == 200 and "area code" in r.text
+    assert 'value="Al"' in r.text  # what they typed is kept
+    r = client.post("/app/onboarding", data=data | {"area_code": "512"}, follow_redirects=False)
+    assert r.headers["location"] == "/app/subscribe"
+    assert db.query(Account).one().area_code == "512"
+
+
+def test_other_trade_free_text(client, db):
+    a = make_account(db)
+    login(client, a)
+    client.post("/app/settings", data={"business_name": "Joe's", "owner_name": "Joe", "owner_phone": "5551234567",
+                                       "trade_key": "other", "trade_other": "Window cleaner"})
+    db.refresh(a)
+    assert (a.trade_key, a.trade) == ("other", "Window cleaner")
+
+
+def test_trade_landing_pages(client, db):
+    r = client.get("/for/plumbers")
+    assert r.status_code == 200 and "For plumbers" in r.text and "stopcock" in r.text and "$29" in r.text
+    assert "trade=plumber" in r.text
+    assert "£25" in client.get("/for/plumbers", headers={"accept-language": "en-GB,en;q=0.9"}).text
+    assert client.get("/for/nope").status_code == 404
+    home = client.get("/")
+    assert "$500+" in home.text and "/for/electricians" in home.text
+
+
+def test_signup_from_trade_page_preselects_trade(client, db):
+    client.post("/signup", data={"email": "l@k.com", "password": "password1", "business_name": "Lock It",
+                                 "country": "US", "trade_key": "locksmith"})
+    a = db.query(Account).one()
+    assert (a.trade_key, a.trade) == ("locksmith", "Locksmith")
+    assert 'value="locksmith" selected' in client.get("/app/onboarding").text
+
+
+def test_admin_can_edit_trade_script(client, db):
+    from app.models import TradeTemplate
+    client.post("/admin/login", data={"password": "admin-pw"})
+    assert "Trade scripts" in client.get("/admin/trades").text
+    client.post("/admin/trades", data={"key": "plumber", "label": "Plumber", "group": "Plumbing & heating",
+                                       "questions": "- Is the water off?", "emergency": "Flooding", "active": "1"})
+    db.expire_all()
+    assert db.get(TradeTemplate, "plumber").questions == "- Is the water off?"
+    client.post("/admin/trades", data={"key": "Window Cleaner", "label": "Window cleaner", "questions": "- How many windows?",
+                                       "active": "1"})
+    assert db.get(TradeTemplate, "window_cleaner") is not None
 
 
 def test_login_wrong_password(client, db):

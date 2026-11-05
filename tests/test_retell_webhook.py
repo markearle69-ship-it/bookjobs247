@@ -49,7 +49,9 @@ def test_call_analyzed_fills_details_notifies_and_bills_once(client, db, no_side
     assert meter_events[0]["payload"] == {"stripe_customer_id": "cus_1", "value": "2"}
     assert meter_events[0]["identifier"] == f"bj-call-{call.id}"
     assert len(no_side_effects["push"]) == 1
-    assert "URGENT" in no_side_effects["push"][0][1]
+    assert "EMERGENCY" in no_side_effects["push"][0][1] and no_side_effects["push"][0][3] is True
+    # Re-sent at 5 and 15 minutes unless opened.
+    assert [d for _, d in no_side_effects["reminders"]] == [300, 900]
 
 
 def test_meter_failure_left_for_retry(client, db, monkeypatch):
@@ -65,3 +67,15 @@ def test_meter_failure_left_for_retry(client, db, monkeypatch):
     monkeypatch.setattr("stripe.billing.MeterEvent.create", fail)
     billing.report_usage(db, call)
     assert not call.usage_reported
+
+
+def test_emergency_reminder_only_if_unopened(db, no_side_effects):
+    from app.push import remind_emergency
+    account = make_account(db)
+    call = Call(account_id=account.id, kind="agent", urgency="emergency", caller_name="Ann")
+    db.add(call)
+    db.commit()
+    assert remind_emergency(db, call) is True
+    assert no_side_effects["push"][-1][1].startswith("🚨 STILL WAITING") and no_side_effects["push"][-1][3]
+    call.is_read = True
+    assert remind_emergency(db, call) is False

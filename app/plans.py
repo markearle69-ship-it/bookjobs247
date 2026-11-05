@@ -25,8 +25,8 @@ class Plan:
 
 
 PLANS = {
-    "US": Plan(currency="usd", symbol="$", monthly=19, included_minutes=30, overage_minor=25),
-    "GB": Plan(currency="gbp", symbol="£", monthly=15, included_minutes=30, overage_minor=20),
+    "US": Plan(currency="usd", symbol="$", monthly=29, included_minutes=60, overage_minor=25),
+    "GB": Plan(currency="gbp", symbol="£", monthly=25, included_minutes=60, overage_minor=20),
 }
 
 

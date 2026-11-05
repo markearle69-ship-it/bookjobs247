@@ -1,44 +1,164 @@
 {% extends "base.html" %}
-{% block title %}{{ settings.app_name }} – never miss a job while you're working{% endblock %}
+{% set s = plan.symbol %}
+{% set agency_month = '$500+' if region == 'US' else '£400+' %}
+{% set agency_setup = '$1,000+' if region == 'US' else '£750+' %}
+{% set ex = trade or marketing[0] %}
+{% set signup_qs = '?country=' ~ region ~ ('&trade=' ~ trade.key if trade else '') %}
+{% block title %}{% if trade %}AI receptionist for {{ trade.plural }}{% else %}AI receptionist for tradespeople{% endif %} – {{ plan.monthly_label }}/month – {{ settings.app_name }}{% endblock %}
 {% block body %}
 <section class="hero">
   <div class="inner">
-    <h1>Never miss another job because you were up a ladder.</h1>
-    <p>{{ settings.app_name }} gives you an AI receptionist that answers the calls you can't. It takes the caller's
-      name, number, address and what they need, then sends it straight to your phone.</p>
-    <a class="btn" href="/signup">Get started</a>
-    {% if account %}<a class="btn secondary" style="color:#fff;border-color:#3a4d63;margin-left:8px" href="/app">Open my calls</a>{% endif %}
+    {% if trade %}<div class="eyebrow">For {{ trade.plural }}</div>{% endif %}
+    <h1>{% if trade %}Never miss another job because you were on one.{% else %}Never miss another job because you were up a ladder.{% endif %}</h1>
+    <p>An AI receptionist answers the calls you can't, in your business's name, 24/7. It takes the caller's name,
+      number, address and exactly what they need, then puts it on your phone.
+      <strong style="color:#fff">{{ plan.monthly_label }} a month, not {{ agency_month }}.</strong></p>
+    <div class="cta-row">
+      <a class="btn" href="/signup{{ signup_qs }}">Get started in 5 minutes</a>
+      {% if account %}<a class="btn ghost" href="/app">Open my calls</a>{% else %}<a class="btn ghost" href="#how">How it works</a>{% endif %}
+    </div>
+    <p class="small" style="margin-top:14px;color:#9fb0c2">No contract · No setup fee · Cancel any time</p>
   </div>
 </section>
-<main class="wrap-wide">
-  <h2 style="margin-top:24px">How it works</h2>
-  <div class="features">
-    <div class="card"><h3>1. Forward missed calls</h3><p class="muted">Takes 30 seconds. Your phone still rings
-      first, and only calls you don't pick up come to us. We give you one-tap set-up buttons.</p></div>
-    <div class="card"><h3>2. Your assistant answers</h3><p class="muted">A friendly, natural-sounding voice answers
-      in your business's name and takes a proper message: who, where, what the job is and how urgent it is.</p></div>
-    <div class="card"><h3>3. Call them back</h3><p class="muted">You get a notification with the job details.
-      Finish your job, open the app, and tap to call them back.</p></div>
-  </div>
-  <div class="card">
-    <h3>On or off with one tap</h3>
-    <p class="muted" style="margin:0">Want calls to go to voicemail instead? Flick the switch in the app. When the
-      assistant is off, voicemails still come to the app with a transcript.</p>
-  </div>
 
-  <h2 style="margin-top:24px">Simple pricing</h2>
-  <div class="pricing">
-    {% for label, country, p in [("US", "US", us), ("UK", "GB", gb)] %}
-    <div class="card">
-      <div class="muted small">{{ label }}</div>
-      <div class="price">{{ p.monthly_label }}<small>/month</small></div>
-      <p>Includes {{ p.included_minutes }} minutes of answered calls, then {{ p.overage_label }} a minute.
-        Voicemail is always free. No contract, cancel any time.</p>
-      <a class="btn block" href="/signup?country={{ country }}">Start ({{ label }})</a>
+<main class="wrap-wide">
+  <section class="split">
+    <div>
+      <h2>Here's what lands on your phone</h2>
+      <p class="muted">The caller talks to your assistant like a normal receptionist. By the time you're off the
+        ladder, the job's waiting for you{% if trade %}, with the questions a {{ trade.label | lower }} needs answered already asked{% endif %}.</p>
+      <div class="bubble caller">“{{ ex.example_caller }}”</div>
     </div>
-    {% endfor %}
-  </div>
-  <p class="muted small" style="margin-top:16px">A typical message-taking call lasts 1–2 minutes, so 30 minutes is
-    roughly 15–30 calls.</p>
+    <div class="phone-card">
+      <div class="small muted">New call · just now</div>
+      <div class="who-line">Sarah Jones <span class="tag emergency">🚨 Emergency</span></div>
+      <div class="job-line">{{ ex.example_job }}</div>
+      <div class="small muted">📍 14 Station Road · ☎ call back ASAP</div>
+      <div class="btn ok block" style="margin-top:12px;pointer-events:none">📞 Call back</div>
+    </div>
+  </section>
+
+  {% if questions %}
+  <section class="card">
+    <h2>Your assistant asks the right questions for {{ trade.plural }}</h2>
+    <ul class="ticks">{% for q in questions %}<li>{{ q }}</li>{% endfor %}</ul>
+    <p class="muted small" style="margin:0">It also knows what counts as an emergency for your trade and flags it,
+      so your phone alerts you straight away and keeps reminding you until you look.</p>
+  </section>
+  {% endif %}
+
+  <section class="card roi" id="roi">
+    <h2>What are missed calls costing you?</h2>
+    <div class="roi-grid">
+      <label>Calls you miss a week <input type="number" id="roi-missed" value="5" min="0" max="200" inputmode="numeric"></label>
+      <label>Average job value ({{ s }}) <input type="number" id="roi-value" value="{{ 250 if region == 'US' else 200 }}" min="0" inputmode="numeric"></label>
+      <label>% that would have booked <input type="number" id="roi-rate" value="30" min="0" max="100" inputmode="numeric"></label>
+    </div>
+    <div class="roi-out">
+      <div><div class="big" id="roi-lost">–</div><div class="muted small">lost to voicemail every month</div></div>
+      <div><div class="big" style="color:var(--ok)">{{ plan.monthly_label }}</div><div class="muted small">to answer every one of them</div></div>
+    </div>
+    <p class="muted small" style="margin:0">Most callers who hit voicemail ring the next business on Google. Win back just
+      <strong>one job</strong> and {{ settings.app_name }} has paid for itself.</p>
+  </section>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <div class="features">
+      <div class="card"><h3>1. Forward missed calls</h3><p class="muted">One tap on your phone. It still rings
+        first; only calls you don't pick up come through. Keep your number, no new phone.</p></div>
+      <div class="card"><h3>2. Your assistant answers</h3><p class="muted">A natural-sounding voice answers as your
+        business and takes a proper message: who, where, what the job is, and how urgent.</p></div>
+      <div class="card"><h3>3. You call them back</h3><p class="muted">A notification lands with the full job details.
+        Finish your job, tap Call back, win the work.</p></div>
+    </div>
+    <div class="card">
+      <h3>On or off with one tap</h3>
+      <p class="muted" style="margin:0">Want missed calls to go to voicemail instead? Flick the switch in the app.
+        Voicemails still come through with a transcript.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Same job as an agency voice agent, a fraction of the price</h2>
+    <div class="card table-scroll" style="padding:0">
+      <table class="compare">
+        <thead><tr><th></th><th>Typical AI agency</th><th class="us">{{ settings.app_name }}</th></tr></thead>
+        <tbody>
+          <tr><td>Monthly cost</td><td>{{ agency_month }}</td><td class="us">{{ plan.monthly_label }}</td></tr>
+          <tr><td>Setup fee</td><td>{{ agency_setup }}</td><td class="us">None</td></tr>
+          <tr><td>Contract</td><td>Often 6–12 months</td><td class="us">Monthly, cancel any time</td></tr>
+          <tr><td>Time to go live</td><td>1–3 weeks</td><td class="us">About 5 minutes</td></tr>
+          <tr><td>Answers in your business name</td><td>✓</td><td class="us">✓</td></tr>
+          <tr><td>Trade-specific questions</td><td>✓</td><td class="us">✓</td></tr>
+          <tr><td>Emergency alerts on your phone</td><td>Sometimes</td><td class="us">✓</td></tr>
+          <tr><td>Recordings + transcripts</td><td>✓</td><td class="us">✓</td></tr>
+          <tr><td>Change your details yourself</td><td>Email the agency</td><td class="us">✓ In the app</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <h2>One simple price</h2>
+    <div class="card price-card">
+      <div class="price">{{ plan.monthly_label }}<small>/month</small></div>
+      <ul class="ticks">
+        <li>Your own {{ 'local' if region == 'US' else 'UK' }} number for missed calls</li>
+        <li>{{ plan.included_minutes }} minutes of answered calls included (about 30–60 calls)</li>
+        <li>Then {{ plan.overage_label }} a minute. Voicemail is always free</li>
+        <li>Trade-specific assistant, emergency alerts, recordings and transcripts</li>
+        <li>No contract, no setup fee</li>
+      </ul>
+      <a class="btn block" href="/signup{{ signup_qs }}">Get started</a>
+      <p class="small muted" style="margin:10px 0 0">
+        {% if region == 'US' %}In the UK? <a href="?country=GB#pricing">See £ pricing</a>{% else %}In the US? <a href="?country=US#pricing">See $ pricing</a>{% endif %}
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Built for your trade</h2>
+    <div class="trade-links">
+      {% for t in marketing %}<a href="/for/{{ t.slug }}{{ '?country=GB' if region == 'GB' else '' }}" class="{{ 'active' if trade and trade.key == t.key }}">{{ t.label }}</a>{% endfor %}
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <details class="faq"><summary>Does my phone still ring?</summary><p>Yes. You set forwarding for calls you
+      <em>don't answer</em>, are busy for, or get when you have no signal. Pick up as normal when you can.</p></details>
+    <details class="faq"><summary>Do I need a new number or phone?</summary><p>No. Customers keep calling your
+      usual number. Your {{ settings.app_name }} number works behind the scenes.</p></details>
+    <details class="faq"><summary>Will callers know it's AI?</summary><p>It sounds natural and answers as your
+      business. If someone asks directly, it's honest that it's an automated assistant taking messages for you.</p></details>
+    <details class="faq"><summary>Does it book jobs or quote prices?</summary><p>No, on purpose. It takes a
+      complete message so <em>you</em> can price and book the job when you call back.</p></details>
+    <details class="faq"><summary>What if I go over {{ plan.included_minutes }} minutes?</summary><p>Extra minutes
+      are {{ plan.overage_label }} each, billed with your monthly payment. A typical message takes 1–2 minutes.</p></details>
+    <details class="faq"><summary>Can I cancel?</summary><p>Any time, in the app. No contract, no cancellation fee.</p></details>
+  </section>
+
+  <section class="card" style="text-align:center;margin-top:24px">
+    <h2>Stop losing jobs to voicemail</h2>
+    <p class="muted">Live in about 5 minutes. {{ plan.monthly_label }}/month.</p>
+    <a class="btn" href="/signup{{ signup_qs }}">Get started</a>
+  </section>
 </main>
+<script>
+(function () {
+  var sym = {{ s | tojson }};
+  function calc() {
+    var m = +document.getElementById("roi-missed").value || 0;
+    var v = +document.getElementById("roi-value").value || 0;
+    var r = (+document.getElementById("roi-rate").value || 0) / 100;
+    var lost = Math.round(m * 4.33 * r * v);
+    document.getElementById("roi-lost").textContent = sym + lost.toLocaleString();
+  }
+  ["roi-missed", "roi-value", "roi-rate"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calc);
+  });
+  calc();
+})();
+</script>
 {% endblock %}

@@ -3,9 +3,10 @@
 {% block body %}
 <main class="wrap">
   <h1>Create your account</h1>
-  <p class="muted">Takes about 3 minutes. Your number is ready as soon as you've paid.</p>
+  <p class="muted">Takes about 3 minutes. Your number is ready as soon as you've paid. No contract.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" action="/signup" class="card">
+    <input type="hidden" name="trade_key" value="{{ form.trade_key or '' }}">
     <label for="business_name">Business name</label>
     <input id="business_name" name="business_name" required maxlength="200" value="{{ form.business_name or '' }}"
            placeholder="e.g. Smith Plumbing & Heating" autocomplete="organization">

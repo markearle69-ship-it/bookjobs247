@@ -74,7 +74,7 @@
         </div>
         <div class="what">
           {% if c.kind == 'voicemail' %}<span class="tag vm">Voicemail</span>{% endif %}
-          {% if c.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ c.urgency }}">{{ {'emergency': 'Urgent', 'soon': 'Soon', 'flexible': 'Flexible'}[c.urgency] }}</span>{% endif %}
+          {% if c.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ c.urgency }}">{{ {'emergency': '🚨 Emergency', 'soon': 'Soon', 'flexible': 'Flexible'}[c.urgency] }}</span>{% endif %}
           {% if c.status == 'in_progress' %}On the call now…{% else %}{{ c.job_description or c.summary or 'No details' }}{% endif %}
         </div>
       </a>

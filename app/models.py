@@ -29,6 +29,14 @@ class Account(Base):
     # Business details, fed to the voice agent on every call.
     business_name: Mapped[str] = mapped_column(String(200))
     owner_name: Mapped[str] = mapped_column(String(120), default="")
+    # What the phone is answered as ("Smith Plumbing") - defaults to business_name.
+    answer_as: Mapped[str] = mapped_column(String(200), default="")
+    # Optional first name the assistant introduces itself with ("this is Sarah").
+    assistant_name: Mapped[str] = mapped_column(String(60), default="")
+    voice_gender: Mapped[str] = mapped_column(String(8), default="female")  # female | male
+    # Key into the trade library (TradeTemplate), or "other".
+    trade_key: Mapped[str] = mapped_column(String(40), default="other")
+    # Human description of the trade (the dropdown label, or what they typed for "other").
     trade: Mapped[str] = mapped_column(String(120), default="")
     services: Mapped[str] = mapped_column(Text, default="")
     service_area: Mapped[str] = mapped_column(String(255), default="")
@@ -64,6 +72,10 @@ class Account(Base):
     @property
     def is_active(self) -> bool:
         return self.subscription_status in ACTIVE_STATUSES
+
+    @property
+    def greeting_name(self) -> str:
+        return self.answer_as or self.business_name
 
     @property
     def currency(self) -> str:
@@ -150,6 +162,21 @@ class PoolNumber(Base):
     # business.
     released_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TradeTemplate(Base):
+    """Per-trade questions + emergency rules fed to the voice agent on each
+    call. Seeded from app/trades.py, editable in /admin/trades."""
+
+    __tablename__ = "trade_templates"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    label: Mapped[str] = mapped_column(String(120))
+    group: Mapped[str] = mapped_column(String(120), default="")
+    questions: Mapped[str] = mapped_column(Text, default="")
+    emergency: Mapped[str] = mapped_column(Text, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class ProcessedStripeEvent(Base):

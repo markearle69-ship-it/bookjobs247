@@ -140,3 +140,47 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); v
 .table-scroll { overflow-x: auto; }
 .hidden { display: none !important; }
 .card > div > p:last-child, .card p:last-child { margin-bottom: 0; }
+
+.radio-row { display: flex; gap: 10px; }
+.radio-row .radio { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0; font-weight: 600;
+  border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; min-height: 48px; cursor: pointer; background: var(--surface); }
+.radio-row .radio input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--brand); }
+.radio-row .radio:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+
+/* Landing v2 */
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: .8rem; font-weight: 800; color: var(--brand); margin-bottom: 8px; }
+.cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn.ghost { background: transparent; color: #fff; border: 1px solid #3a4d63; }
+main section { margin-top: 28px; }
+.split { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: center; }
+.bubble { background: var(--surface); border: 1px solid var(--line); border-radius: 18px 18px 18px 4px; padding: 14px 16px;
+  font-size: 1.05rem; box-shadow: var(--shadow); }
+.phone-card { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--danger);
+  border-radius: var(--radius); padding: 16px; box-shadow: 0 8px 24px rgba(16,24,40,.12); max-width: 380px; width: 100%; justify-self: center; }
+.phone-card .who-line { font-weight: 800; font-size: 1.1rem; margin: 4px 0; }
+.phone-card .job-line { margin-bottom: 6px; }
+ul.ticks { list-style: none; padding: 0; margin: 0 0 14px; }
+ul.ticks li { padding-left: 28px; position: relative; margin-bottom: 8px; }
+ul.ticks li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--ok); font-weight: 800; }
+.roi-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
+.roi-grid label { margin: 0; font-size: .9rem; }
+.roi-grid input { margin-top: 6px; }
+.roi-out { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+.roi-out > div { background: var(--bg); border-radius: 12px; padding: 12px; }
+.roi-out .big { font-size: 1.7rem; font-weight: 800; color: var(--danger); }
+table.compare th, table.compare td { padding: 12px; }
+table.compare td:first-child { color: var(--muted); }
+table.compare .us { background: var(--brand-soft); font-weight: 700; }
+table.compare thead .us { color: var(--brand); }
+.price-card { max-width: 520px; }
+.trade-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.trade-links a { padding: 8px 14px; border: 1px solid var(--line); border-radius: 99px; text-decoration: none; color: var(--ink);
+  background: var(--surface); font-size: .92rem; }
+.trade-links a.active { border-color: var(--brand); color: var(--brand); font-weight: 700; }
+details.faq { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+details.faq summary { font-weight: 700; cursor: pointer; }
+details.faq p { margin: 10px 0 0; color: var(--muted); }
+@media (min-width: 720px) {
+  .split { grid-template-columns: 1.2fr 1fr; }
+  .roi-grid { grid-template-columns: repeat(3, 1fr); }
+}

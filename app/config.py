@@ -21,11 +21,13 @@ class Settings(BaseSettings):
 
     # --- Retell ---
     retell_api_key: str = ""
-    # One shared agent per country (different voice/accent). Each call passes
-    # the business's own details in as dynamic variables, so no per-customer
-    # agent is ever created. Create both with scripts/setup_retell.py.
-    retell_agent_id_us: str = ""
-    retell_agent_id_gb: str = ""
+    # Four shared agents: country (accent) x voice gender. Each call passes the
+    # business's own details and trade script in as dynamic variables, so no
+    # per-customer agent is ever created. Create them with scripts/setup_retell.py.
+    retell_agent_id_us_female: str = ""
+    retell_agent_id_us_male: str = ""
+    retell_agent_id_gb_female: str = ""
+    retell_agent_id_gb_male: str = ""
 
     # --- Twilio ---
     twilio_account_sid: str = ""

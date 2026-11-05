@@ -54,5 +54,15 @@ def require_ready_account(account: Account = Depends(require_account)) -> Accoun
     return account
 
 
+def region_for(request: Request, override: str = "") -> str:
+    """US or GB for public pages: ?country= wins, else the browser language."""
+    if override.upper() in ("GB", "UK"):
+        return "GB"
+    if override.upper() == "US":
+        return "US"
+    lang = request.headers.get("accept-language", "").lower()
+    return "GB" if lang.startswith("en-gb") else "US"
+
+
 def render(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, ctx)

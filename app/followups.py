@@ -7,7 +7,7 @@ import logging
 
 from .db import SessionLocal
 from .models import Call
-from .push import notify_call
+from .push import notify_call, remind_emergency
 
 log = logging.getLogger(__name__)
 
@@ -42,3 +42,26 @@ def schedule(call_id: int, delay_seconds: float) -> None:
         asyncio.get_running_loop().create_task(_run())
     except RuntimeError:  # no event loop (scripts) - just run it now
         finalize(call_id)
+
+
+def _remind(call_id: int) -> None:
+    db = SessionLocal()
+    try:
+        call = db.get(Call, call_id)
+        if call is not None:
+            remind_emergency(db, call)
+    except Exception:
+        log.exception("Emergency reminder for call %s failed", call_id)
+    finally:
+        db.close()
+
+
+def schedule_emergency_reminder(call_id: int, delay_seconds: float) -> None:
+    async def _run():
+        await asyncio.sleep(delay_seconds)
+        await asyncio.to_thread(_remind, call_id)
+
+    try:
+        asyncio.get_running_loop().create_task(_run())
+    except RuntimeError:
+        pass  # no event loop (scripts/tests) - reminders only matter in the running app

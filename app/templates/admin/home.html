@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Admin – {{ settings.app_name }}{% endblock %}
-{% block nav %}<span class="small">Admin</span>{% endblock %}
+{% block nav %}<a href="/admin">Customers</a><a href="/admin/trades">Trade scripts</a>{% endblock %}
 {% block body %}
 <main class="wrap-wide">
   {% if msg %}<div class="notice">{{ msg }}</div>{% endif %}

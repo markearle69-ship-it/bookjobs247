@@ -12,7 +12,7 @@ from . import billing
 from .activation import ensure_number
 from .config import settings
 from .db import get_db
-from .models import Account, Call, PoolNumber, utcnow
+from .models import Account, Call, PoolNumber, TradeTemplate, utcnow
 from .phone import normalize
 from .security import ADMIN_COOKIE, ADMIN_MAX_AGE, make_admin_session, read_admin_session
 from .telephony import POOL_COOLDOWN, ProvisioningError, lookup_owned_number
@@ -108,3 +108,35 @@ def retry_usage(request: Request, db: Session = Depends(get_db)):
         billing.report_usage(db, call)
     left = sum(1 for c in pending if not c.usage_reported)
     return _go(f"Reported {len(pending) - left}, {left} still failing")
+
+
+# ---------------------------------------------------------------- trade scripts
+
+@router.get("/trades")
+def trades_page(request: Request, msg: str = "", db: Session = Depends(get_db)):
+    if not _is_admin(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    rows = db.query(TradeTemplate).order_by(TradeTemplate.sort_order).all()
+    in_use = dict(db.query(Account.trade_key, func.count(Account.id)).group_by(Account.trade_key).all())
+    return render(request, "admin/trades.html", trades=rows, in_use=in_use, msg=msg)
+
+
+@router.post("/trades")
+def save_trade(request: Request, key: str = Form(...), label: str = Form(...), group: str = Form(""),
+               questions: str = Form(""), emergency: str = Form(""), active: str = Form(""),
+               db: Session = Depends(get_db)):
+    if not _is_admin(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    key = "".join(ch for ch in key.strip().lower().replace(" ", "_") if ch.isalnum() or ch == "_")[:40]
+    if not key or key == "other" or not label.strip():
+        return RedirectResponse("/admin/trades?msg=Key and label are required", status_code=303)
+    row = db.get(TradeTemplate, key)
+    if row is None:
+        last = db.query(func.max(TradeTemplate.sort_order)).scalar() or 0
+        row = TradeTemplate(key=key, sort_order=last + 10)
+        db.add(row)
+    row.label, row.group = label.strip()[:120], group.strip()[:120]
+    row.questions, row.emergency = questions.strip(), emergency.strip()
+    row.active = active == "1"
+    db.commit()
+    return RedirectResponse(f"/admin/trades?msg=Saved {row.label}#t-{key}", status_code=303)

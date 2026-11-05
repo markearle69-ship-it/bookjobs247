@@ -16,15 +16,19 @@ def test_agent_on_dials_retell_with_business_details(client, db, monkeypatch):
     account = make_account(db)
     captured = {}
 
-    def fake_register(acct, from_number, to_number, row_id, sid):
-        captured.update(vars=retell.dynamic_variables(acct), row_id=row_id, sid=sid)
+    def fake_register(acct, from_number, to_number, row_id, sid, trade=None):
+        captured.update(vars=retell.dynamic_variables(acct, trade), row_id=row_id, sid=sid)
         return "call_abc"
 
     monkeypatch.setattr(retell, "register_phone_call", fake_register)
     r = post_voice(client)
     assert "<Sip>sip:call_abc@sip.retellai.com</Sip>" in r.text
     assert 'action="https://bj.example.com/twilio/dial-done"' in r.text
-    assert captured["vars"]["business_name"] == "Joe's Plumbing"
+    v = captured["vars"]
+    assert v["answer_as"] == "Joe's Plumbing"
+    assert v["greeting"].startswith("Hi, thanks for calling Joe's Plumbing. Joe is out on a job")
+    assert "stopcock" in v["trade_questions"]  # plumber script was used
+    assert v["emergency_number"] == "911"
     call = db.query(Call).one()
     assert call.kind == "agent" and call.retell_call_id == "call_abc" and call.from_number == "+15551112222"
     db.refresh(account)
@@ -98,3 +102,23 @@ def test_twilio_signature_enforced(client, db, monkeypatch):
     monkeypatch.setattr(settings, "twilio_validate_signatures", True)
     make_account(db)
     assert post_voice(client).status_code == 403
+
+
+def test_dynamic_variables_greeting_voice_and_uk_safety(db):
+    from app.models import TradeTemplate
+    a = make_account(db, country="GB", answer_as="Smith Heating", assistant_name="Sarah", voice_gender="male",
+                     trade_key="heating", twilio_number="+447700900001")
+    v = retell.dynamic_variables(a, db.get(TradeTemplate, "heating"))
+    assert v["greeting"].startswith("Hi, thanks for calling Smith Heating, this is Sarah.")
+    assert "0800 111 999" in v["emergency_signs"] and "{{" not in v["emergency_signs"]
+    assert v["assistant_name"] == " Your name is Sarah."
+    # GB male agent not configured -> falls back to GB female; US male configured.
+    assert retell.agent_id_for("GB", "male") == "agent_gb_f"
+    assert retell.agent_id_for("US", "male") == "agent_us_m"
+
+
+def test_other_trade_uses_generic_questions(db):
+    from app.trades import OTHER_QUESTIONS
+    a = make_account(db, trade_key="other", trade="Window cleaner")
+    v = retell.dynamic_variables(a, None)
+    assert v["trade_questions"] == OTHER_QUESTIONS and v["trade"] == "Window cleaner"

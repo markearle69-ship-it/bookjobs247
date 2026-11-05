@@ -6,7 +6,7 @@
   <h1>{{ call.caller_name or (call.from_number | pretty) or 'Unknown caller' }}</h1>
   <p class="muted">
     {% if call.kind == 'voicemail' %}<span class="tag vm">Voicemail</span>{% endif %}
-    {% if call.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ call.urgency }}">{{ {'emergency': 'Urgent', 'soon': 'Soon', 'flexible': 'Flexible'}[call.urgency] }}</span>{% endif %}
+    {% if call.urgency in ('emergency', 'soon', 'flexible') %}<span class="tag {{ call.urgency }}">{{ {'emergency': '🚨 Emergency', 'soon': 'Soon', 'flexible': 'Flexible'}[call.urgency] }}</span>{% endif %}
     <span data-ts="{{ call.created_at.isoformat() }}Z">{{ call.created_at.strftime('%d %b %Y %H:%M') }}</span>
     {% if call.duration_seconds %}· {{ (call.duration_seconds // 60) }}m {{ call.duration_seconds % 60 }}s{% endif %}
   </p>

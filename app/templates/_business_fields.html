@@ -1,30 +1,91 @@
 <label for="business_name">Business name</label>
-<input id="business_name" name="business_name" maxlength="200" value="{{ account.business_name }}" required>
+<input id="business_name" name="business_name" maxlength="200" value="{{ account.business_name or '' }}" required>
 
-<label for="owner_name">Your first name <span class="hint">– the assistant says "{name} is out on a job"</span></label>
-<input id="owner_name" name="owner_name" maxlength="120" value="{{ account.owner_name }}" required autocomplete="given-name">
+<label for="trade_key">Type of business <span class="hint">– your assistant asks the right questions for your trade</span></label>
+<select id="trade_key" name="trade_key" required>
+  <option value="" {% if not account.trade_key %}selected{% endif %} disabled>Choose your trade…</option>
+  {% for group, rows in trades %}
+  <optgroup label="{{ group }}">
+    {% for t in rows %}<option value="{{ t.key }}" {% if account.trade_key == t.key %}selected{% endif %}>{{ t.label }}</option>{% endfor %}
+  </optgroup>
+  {% endfor %}
+  <option value="other" {% if account.trade_key == 'other' and account.onboarding_complete %}selected{% endif %}>Something else…</option>
+</select>
+<div id="trade-other-wrap" class="{{ '' if account.trade_key == 'other' and account.onboarding_complete else 'hidden' }}">
+  <label for="trade_other">What's your trade?</label>
+  <input id="trade_other" name="trade_other" maxlength="120" value="{{ account.trade if account.trade_key == 'other' else '' }}"
+         placeholder="e.g. window cleaner, tree surgeon">
+</div>
 
-<label for="trade">Your trade</label>
-<input id="trade" name="trade" maxlength="120" value="{{ account.trade }}" required
-       placeholder="e.g. plumber, electrician, roofer, cleaner" list="trades">
-<datalist id="trades">
-  {% for t in ["plumber", "electrician", "heating engineer", "roofer", "builder", "carpenter", "painter and decorator",
-               "landscaper", "locksmith", "cleaner", "HVAC technician", "handyman", "pest control", "garage door repair"] %}
-  <option value="{{ t }}">{% endfor %}
-</datalist>
+<label for="owner_name">Your first name <span class="hint">– "{name} is out on a job right now"</span></label>
+<input id="owner_name" name="owner_name" maxlength="120" value="{{ account.owner_name or '' }}" required autocomplete="given-name">
 
-<label for="services">What jobs do you do? <span class="hint">– helps the assistant understand callers</span></label>
+<label for="owner_phone">Your mobile / business number <span class="hint">– the phone customers call you on</span></label>
+<input id="owner_phone" name="owner_phone" type="tel" required value="{{ account.owner_phone | pretty }}" autocomplete="tel"
+       placeholder="{{ '07700 900123' if account.country == 'GB' else '(555) 123-4567' }}">
+
+{% if show_area_code and account.country == 'US' %}
+<label for="area_code">Area code for your new local number <span class="hint">– so customers see a local number</span></label>
+<input id="area_code" name="area_code" inputmode="numeric" pattern="[0-9]{3}" maxlength="3" required
+       value="{{ account.area_code or '' }}" placeholder="e.g. 512">
+{% endif %}
+
+<h3 style="margin-top:22px">How your assistant answers</h3>
+<label for="answer_as">Name to answer the phone as</label>
+<input id="answer_as" name="answer_as" maxlength="200" value="{{ account.answer_as or '' }}"
+       placeholder="{{ account.business_name or 'Your business name' }}">
+<p class="small muted" style="margin:6px 0 0">Leave blank to use your business name.</p>
+
+<label for="assistant_name">Assistant's first name <span class="hint">(optional)</span></label>
+<input id="assistant_name" name="assistant_name" maxlength="60" value="{{ account.assistant_name or '' }}" placeholder="e.g. Sarah">
+
+<label>Voice</label>
+<div class="radio-row">
+  <label class="radio"><input type="radio" name="voice_gender" value="female" {% if account.voice_gender != 'male' %}checked{% endif %}> Female</label>
+  <label class="radio"><input type="radio" name="voice_gender" value="male" {% if account.voice_gender == 'male' %}checked{% endif %}> Male</label>
+</div>
+
+<div class="greeting-preview card" style="margin:14px 0 0;background:var(--bg)">
+  <div class="small muted">Callers will hear:</div>
+  <div id="greeting-preview" style="font-weight:600"></div>
+</div>
+
+<h3 style="margin-top:22px">About your work <span class="hint" style="font-weight:400">(optional, helps the assistant)</span></h3>
+<label for="services">What jobs do you do?</label>
 <textarea id="services" name="services" maxlength="2000"
-          placeholder="e.g. Boiler repairs and servicing, leaks, bathroom fitting, emergency call-outs">{{ account.services }}</textarea>
+          placeholder="e.g. Boiler repairs and servicing, leaks, bathroom fitting, emergency call-outs">{{ account.services or '' }}</textarea>
 
 <label for="service_area">Area you cover</label>
-<input id="service_area" name="service_area" maxlength="255" value="{{ account.service_area }}"
+<input id="service_area" name="service_area" maxlength="255" value="{{ account.service_area or '' }}"
        placeholder="{{ 'e.g. Leeds and 15 miles around' if account.country == 'GB' else 'e.g. Austin and surrounding suburbs' }}">
 
 <label for="business_hours">Usual working hours</label>
-<input id="business_hours" name="business_hours" maxlength="255" value="{{ account.business_hours }}"
+<input id="business_hours" name="business_hours" maxlength="255" value="{{ account.business_hours or '' }}"
        placeholder="e.g. Mon–Fri 8am–6pm, Sat mornings">
 
-<label for="owner_phone">Your mobile / business number <span class="hint">– the phone you'll forward from</span></label>
-<input id="owner_phone" name="owner_phone" type="tel" required value="{{ account.owner_phone | pretty }}" autocomplete="tel"
-       placeholder="{{ '07700 900123' if account.country == 'GB' else '(555) 123-4567' }}">
+<script>
+(function () {
+  var sel = document.getElementById("trade_key"), wrap = document.getElementById("trade-other-wrap");
+  var other = document.getElementById("trade_other");
+  function syncTrade() {
+    var isOther = sel.value === "other";
+    wrap.classList.toggle("hidden", !isOther);
+    other.required = isOther;
+  }
+  sel.addEventListener("change", syncTrade); syncTrade();
+
+  var biz = document.getElementById("business_name"), as = document.getElementById("answer_as");
+  var asst = document.getElementById("assistant_name"), owner = document.getElementById("owner_name");
+  var out = document.getElementById("greeting-preview");
+  function preview() {
+    var name = as.value.trim() || biz.value.trim() || "your business";
+    var line = "“Hi, thanks for calling " + name;
+    if (asst.value.trim()) line += ", this is " + asst.value.trim();
+    line += ". " + (owner.value.trim() || "the owner") + " is out on a job right now, so I'm taking messages. What can we help you with?”";
+    out.textContent = line;
+    as.placeholder = biz.value.trim() || "Your business name";
+  }
+  [biz, as, asst, owner].forEach(function (el) { el.addEventListener("input", preview); });
+  preview();
+})();
+</script>

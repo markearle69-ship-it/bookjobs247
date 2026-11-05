@@ -4,6 +4,7 @@
 <main class="wrap">
   <h1>Settings</h1>
   {% if saved %}<div class="success">Saved. Your assistant will use this from the next call.</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
   <form method="post" action="/app/settings" class="card">
     <h2>Your business</h2>

@@ -26,26 +26,62 @@ class RetellError(Exception):
     pass
 
 
-def agent_id_for(country: str) -> str:
-    return settings.retell_agent_id_gb if country == "GB" else settings.retell_agent_id_us
+SAFETY = {
+    "GB": {"emergency_number": "999",
+           "gas_emergency": "the National Gas Emergency line on 0800 111 999"},
+    "US": {"emergency_number": "911",
+           "gas_emergency": "911 or their gas company's emergency line, from outside the building"},
+}
 
 
-def dynamic_variables(account: Account) -> dict[str, str]:
+def agent_id_for(country: str, voice_gender: str = "female") -> str:
+    male = voice_gender == "male"
+    if country == "GB":
+        return (settings.retell_agent_id_gb_male if male else "") or settings.retell_agent_id_gb_female
+    return (settings.retell_agent_id_us_male if male else "") or settings.retell_agent_id_us_female
+
+
+def build_greeting(account: Account) -> str:
+    owner = account.owner_name or "the owner"
+    intro = f"Hi, thanks for calling {account.greeting_name}"
+    if account.assistant_name:
+        intro += f", this is {account.assistant_name}"
+    return f"{intro}. {owner} is out on a job right now, so I'm taking messages. What can we help you with?"
+
+
+def _fill_safety(text: str, safety: dict) -> str:
+    for k, v in safety.items():
+        text = text.replace("{{" + k + "}}", v)
+    return text
+
+
+def dynamic_variables(account: Account, trade=None) -> dict[str, str]:
+    """`trade` is the account's TradeTemplate row, or None for "other"."""
+    from .trades import OTHER_EMERGENCY, OTHER_QUESTIONS
+
+    safety = SAFETY.get(account.country, SAFETY["US"])
+    questions = (trade.questions if trade else "") or OTHER_QUESTIONS
+    emergency = (trade.emergency if trade else "") or OTHER_EMERGENCY
     return {
-        "business_name": account.business_name,
+        "greeting": build_greeting(account),
+        "answer_as": account.greeting_name,
+        "assistant_name": f" Your name is {account.assistant_name}." if account.assistant_name else "",
         "owner_name": account.owner_name or "the owner",
-        "trade": account.trade or "trades",
+        "trade": account.trade or (trade.label if trade else "trades"),
         "services": account.services or "general work",
         "service_area": account.service_area or "the local area",
         "business_hours": account.business_hours or "not specified",
+        "trade_questions": _fill_safety(questions, safety),
+        "emergency_signs": _fill_safety(emergency, safety),
+        **safety,
     }
 
 
 def register_phone_call(account: Account, from_number: str, to_number: str, call_row_id: int,
-                        twilio_call_sid: str) -> str:
+                        twilio_call_sid: str, trade=None) -> str:
     """Returns the Retell call_id to dial. Raises RetellError on any failure
     so the caller can fall back to voicemail instead of dropping the call."""
-    agent_id = agent_id_for(account.country)
+    agent_id = agent_id_for(account.country, account.voice_gender)
     if not settings.retell_api_key or not agent_id:
         raise RetellError("Retell API key or agent id not configured")
     payload = {
@@ -54,7 +90,7 @@ def register_phone_call(account: Account, from_number: str, to_number: str, call
         "to_number": to_number,
         "direction": "inbound",
         "metadata": {"account_id": account.id, "call_row_id": call_row_id, "twilio_call_sid": twilio_call_sid},
-        "retell_llm_dynamic_variables": dynamic_variables(account),
+        "retell_llm_dynamic_variables": dynamic_variables(account, trade),
     }
     try:
         # Short timeout: the caller is listening to silence while this runs.

@@ -9,7 +9,7 @@ from . import billing, followups, retell, telephony
 from .activation import ensure_number
 from .config import settings
 from .db import get_db
-from .models import Account, Call, utcnow
+from .models import Account, Call, TradeTemplate, utcnow
 from .push import notify_call
 
 log = logging.getLogger(__name__)
@@ -65,7 +65,8 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
         return _start_voicemail(db, call, account)
 
     try:
-        retell_call_id = retell.register_phone_call(account, from_number, to_number, call.id, call_sid)
+        trade = db.get(TradeTemplate, account.trade_key) if account.trade_key else None
+        retell_call_id = retell.register_phone_call(account, from_number, to_number, call.id, call_sid, trade)
     except retell.RetellError as exc:
         log.error("Retell register failed for account %s, falling back to voicemail: %s", account.id, exc)
         return _start_voicemail(db, call, account)

@@ -13,13 +13,14 @@ from .config import settings
 from .db import get_db
 from .emails import send_email
 from .forwarding import codes_for
-from .models import Account, Call, PushSubscription, utcnow
+from .models import Account, Call, PushSubscription, TradeTemplate, utcnow
 from .phone import normalize
 from .plans import plan_for
 from .push import send_to_account
+from .trades import BY_KEY, BY_SLUG, grouped_trades, marketing_trades
 from .security import (SESSION_COOKIE, SESSION_MAX_AGE, hash_password, make_reset_token, make_session,
                        read_reset_token, verify_password)
-from .web import current_account, next_setup_step, render, require_account, require_ready_account
+from .web import current_account, next_setup_step, region_for, render, require_account, require_ready_account
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,21 +36,40 @@ def _login_response(url: str, account: Account) -> RedirectResponse:
 # ---------------------------------------------------------------- public
 
 @router.get("/")
-def landing(request: Request, account: Account | None = Depends(current_account)):
-    return render(request, "landing.html", account=account, us=plan_for("US"), gb=plan_for("GB"))
+def landing(request: Request, country: str = "", account: Account | None = Depends(current_account),
+            db: Session = Depends(get_db)):
+    region = region_for(request, country)
+    return render(request, "landing.html", account=account, region=region, plan=plan_for(region),
+                  trade=None, marketing=marketing_trades(), questions=None)
+
+
+@router.get("/for/{slug}")
+def trade_page(request: Request, slug: str, country: str = "", account: Account | None = Depends(current_account),
+               db: Session = Depends(get_db)):
+    t = BY_SLUG.get(slug)
+    if t is None:
+        raise HTTPException(status_code=404)
+    row = db.get(TradeTemplate, t.key)
+    region = region_for(request, country)
+    questions = [q.lstrip("- ").strip() for q in ((row.questions if row else t.questions) or "").splitlines()
+                 if q.strip()]
+    return render(request, "landing.html", account=account, region=region, plan=plan_for(region), trade=t,
+                  marketing=marketing_trades(), questions=questions)
 
 
 @router.get("/signup")
-def signup_form(request: Request, country: str = "US"):
-    return render(request, "signup.html", error=None, form={"country": "GB" if country == "GB" else "US"})
+def signup_form(request: Request, country: str = "", trade: str = ""):
+    return render(request, "signup.html", error=None,
+                  form={"country": region_for(request, country), "trade_key": trade if trade in BY_KEY else ""})
 
 
 @router.post("/signup")
 def signup(request: Request, email: str = Form(...), password: str = Form(...),
-           business_name: str = Form(...), country: str = Form("US"), db: Session = Depends(get_db)):
+           business_name: str = Form(...), country: str = Form("US"), trade_key: str = Form(""),
+           db: Session = Depends(get_db)):
     email = email.strip().lower()
     country = "GB" if country == "GB" else "US"
-    form = {"email": email, "business_name": business_name, "country": country}
+    form = {"email": email, "business_name": business_name, "country": country, "trade_key": trade_key}
     if "@" not in email or len(email) > 255:
         return render(request, "signup.html", error="Please enter a valid email address.", form=form)
     if len(password) < 8:
@@ -61,6 +81,8 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
                       form=form)
     account = Account(email=email, password_hash=hash_password(password),
                       business_name=business_name.strip()[:200], country=country)
+    if trade_key in BY_KEY:  # came from a /for/<trade> page: pre-select their trade
+        account.trade_key, account.trade = trade_key, BY_KEY[trade_key].label
     db.add(account)
     db.commit()
     return _login_response("/app/onboarding", account)
@@ -132,38 +154,78 @@ def reset(request: Request, token: str, password: str = Form(...), db: Session =
 
 # ---------------------------------------------------------------- signup steps
 
+def _details_ctx(db: Session, account: Account, **extra) -> dict:
+    return {"account": account, "trades": grouped_trades(db), **extra}
+
+
+def _apply_business_details(db: Session, account: Account, form, include_area_code: bool) -> str | None:
+    """Copy the business-details form onto the account. Returns an error
+    message if something required is missing, else None."""
+    def f(name: str, limit: int) -> str:
+        return str(form.get(name) or "").strip()[:limit]
+
+    if f("business_name", 200):
+        account.business_name = f("business_name", 200)
+    account.answer_as = f("answer_as", 200)
+    account.assistant_name = f("assistant_name", 60)
+    account.voice_gender = "male" if form.get("voice_gender") == "male" else "female"
+    account.owner_name = f("owner_name", 120)
+    key = f("trade_key", 40)
+    trade = db.get(TradeTemplate, key) if key and key != "other" else None
+    if trade:
+        account.trade_key, account.trade = trade.key, trade.label
+    else:
+        account.trade_key, account.trade = "other", f("trade_other", 120)
+    account.services = f("services", 2000)
+    account.service_area = f("service_area", 255)
+    account.business_hours = f("business_hours", 255)
+    account.owner_phone = normalize(f("owner_phone", 40), account.country)[:32]
+    if include_area_code and account.country == "US":
+        digits = "".join(ch for ch in f("area_code", 10) if ch.isdigit())
+        account.area_code = digits if len(digits) == 3 else ""
+
+    missing = []
+    if not account.owner_name:
+        missing.append("your first name")
+    if not account.trade:
+        missing.append("your type of business")
+    if not account.owner_phone:
+        missing.append("your phone number")
+    if include_area_code and account.country == "US" and not account.area_code:
+        missing.append("a 3-digit area code for your local number")
+    return f"Please fill in {', '.join(missing)}." if missing else None
+
+
 @router.get("/app/onboarding")
-def onboarding_form(request: Request, account: Account = Depends(require_account)):
-    return render(request, "onboarding.html", account=account, error=None)
+def onboarding_form(request: Request, account: Account = Depends(require_account), db: Session = Depends(get_db)):
+    return render(request, "onboarding.html", **_details_ctx(db, account, error=None))
 
 
 @router.post("/app/onboarding")
-def onboarding(request: Request, owner_name: str = Form(""), trade: str = Form(""), services: str = Form(""),
-               service_area: str = Form(""), business_hours: str = Form(""), owner_phone: str = Form(""),
-               area_code: str = Form(""), business_name: str = Form(""),
-               account: Account = Depends(require_account), db: Session = Depends(get_db)):
-    _apply_business_details(account, business_name, owner_name, trade, services, service_area, business_hours,
-                            owner_phone, area_code)
-    if not (account.owner_name and account.trade and account.owner_phone):
-        return render(request, "onboarding.html", account=account,
-                      error="Please fill in your name, your trade and your phone number.")
+async def onboarding(request: Request, account: Account = Depends(require_account), db: Session = Depends(get_db)):
+    form = await request.form()
+    error = _apply_business_details(db, account, form, include_area_code=True)
+    if error:
+        db.rollback()
+        db.refresh(account)
+        # Re-show what they typed.
+        return render(request, "onboarding.html", **_details_ctx(db, _FormView(account, form), error=error))
     account.onboarding_complete = True
     db.commit()
     return RedirectResponse(next_setup_step(account) or "/app/setup", status_code=303)
 
 
-def _apply_business_details(account, business_name, owner_name, trade, services, service_area, business_hours,
-                            owner_phone, area_code):
-    if business_name.strip():
-        account.business_name = business_name.strip()[:200]
-    account.owner_name = owner_name.strip()[:120]
-    account.trade = trade.strip()[:120]
-    account.services = services.strip()[:2000]
-    account.service_area = service_area.strip()[:255]
-    account.business_hours = business_hours.strip()[:255]
-    account.owner_phone = normalize(owner_phone, account.country)[:32]
-    digits = "".join(ch for ch in area_code if ch.isdigit())
-    account.area_code = digits[:3] if len(digits) >= 3 else ""
+class _FormView:
+    """Wraps an account so a re-rendered form shows the submitted values."""
+
+    def __init__(self, account: Account, form):
+        self._a, self._f = account, form
+
+    def __getattr__(self, name):
+        alias = {"trade": "trade_other"}.get(name, name)
+        if alias in self._f:
+            return self._f.get(alias)
+        return getattr(self._a, name)
 
 
 @router.get("/app/subscribe")
@@ -289,17 +351,21 @@ def call_recording(call_id: int, account: Account = Depends(require_ready_accoun
 # ---------------------------------------------------------------- settings
 
 @router.get("/app/settings")
-def settings_page(request: Request, saved: int = 0, account: Account = Depends(require_ready_account)):
-    return render(request, "settings.html", account=account, saved=bool(saved), error=None)
+def settings_page(request: Request, saved: int = 0, account: Account = Depends(require_ready_account),
+                  db: Session = Depends(get_db)):
+    return render(request, "settings.html", **_details_ctx(db, account, saved=bool(saved), error=None))
 
 
 @router.post("/app/settings")
-def save_settings(request: Request, business_name: str = Form(""), owner_name: str = Form(""),
-                  trade: str = Form(""), services: str = Form(""), service_area: str = Form(""),
-                  business_hours: str = Form(""), owner_phone: str = Form(""),
-                  account: Account = Depends(require_ready_account), db: Session = Depends(get_db)):
-    _apply_business_details(account, business_name, owner_name, trade, services, service_area, business_hours,
-                            owner_phone, account.area_code)
+async def save_settings(request: Request, account: Account = Depends(require_ready_account),
+                        db: Session = Depends(get_db)):
+    form = await request.form()
+    error = _apply_business_details(db, account, form, include_area_code=False)
+    if error:
+        db.rollback()
+        db.refresh(account)
+        return render(request, "settings.html",
+                      **_details_ctx(db, _FormView(account, form), saved=False, error=error))
     db.commit()
     return RedirectResponse("/app/settings?saved=1", status_code=303)
 
