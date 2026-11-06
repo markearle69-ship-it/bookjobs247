@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     # umbrella home page at "/"; everything else (the app, signup, trade pages)
     # lives on PUBLIC_BASE_URL (callcapturer.com). One deployment serves both.
     brand_url: str = ""
+    # Your Skool community, linked from the tools page footer. Blank hides it.
+    community_url: str = "https://stressfreeservicesquad.com"
+    community_name: str = "StressFree Service Squad"
     support_email: str = ""
 
     # This service's public HTTPS URL, no trailing slash. Used to build every

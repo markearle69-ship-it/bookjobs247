@@ -80,6 +80,8 @@ def test_brand_domain_home_and_waitlist(client, db):
     home = client.get("/", headers=BRAND)
     assert "We do the admin." in home.text and "Coming soon" in home.text
     assert "StressFree <span>Service</span>" in home.text
+    assert 'href="https://stressfreeservicesquad.com"' in home.text  # Skool community in footer
+    assert "stressfreeservicesquad.com" not in client.get("/").text  # not on Call Capturer pages
     assert 'href="https://bj.example.com"' in home.text  # Call Capturer card -> its own domain
     for _ in range(2):  # duplicate signup is ignored
         r = client.post("/waitlist", data={"email": "Pat@Example.com", "product": "quotes"}, headers=BRAND,

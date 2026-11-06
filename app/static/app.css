@@ -198,3 +198,5 @@ details.faq p { margin: 10px 0 0; color: var(--muted); }
 .tool-card.live { border: 2px solid var(--brand); }
 @media (min-width: 720px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 420px) { .hide-sm { display: none; } }
+.site-footer .community { background: rgba(255,255,255,.06); border-radius: 10px; padding: 10px 14px; display: inline-block; }
+.site-footer .community a { color: var(--brand); font-weight: 700; }
