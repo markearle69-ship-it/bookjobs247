@@ -50,8 +50,8 @@ def test_call_analyzed_fills_details_notifies_and_bills_once(client, db, no_side
     assert meter_events[0]["identifier"] == f"bj-call-{call.id}"
     assert len(no_side_effects["push"]) == 1
     assert "EMERGENCY" in no_side_effects["push"][0][1] and no_side_effects["push"][0][3] is True
-    # Re-sent at 5 and 15 minutes unless opened.
-    assert [d for _, d in no_side_effects["reminders"]] == [300, 900]
+    # Emergencies are always emailed too.
+    assert any("EMERGENCY" in subj for _, subj, _ in no_side_effects["emails"])
 
 
 def test_meter_failure_left_for_retry(client, db, monkeypatch):
@@ -69,13 +69,44 @@ def test_meter_failure_left_for_retry(client, db, monkeypatch):
     assert not call.usage_reported
 
 
-def test_emergency_reminder_only_if_unopened(db, no_side_effects):
-    from app.push import remind_emergency
+def test_emergency_reminders_at_5_and_15_minutes_until_opened(db, no_side_effects):
+    from datetime import timedelta
+
+    from app.followups import run_due_jobs
+    from app.models import utcnow
     account = make_account(db)
-    call = Call(account_id=account.id, kind="agent", urgency="emergency", caller_name="Ann")
+    now = utcnow()
+    call = Call(account_id=account.id, kind="agent", urgency="emergency", caller_name="Ann", notified=True,
+                notified_at=now - timedelta(minutes=6), status="complete")
     db.add(call)
     db.commit()
-    assert remind_emergency(db, call) is True
-    assert no_side_effects["push"][-1][1].startswith("🚨 STILL WAITING") and no_side_effects["push"][-1][3]
-    call.is_read = True
-    assert remind_emergency(db, call) is False
+    run_due_jobs(db)
+    assert call.reminders_sent == 1 and no_side_effects["push"][-1][1].startswith("🚨 STILL WAITING")
+    run_due_jobs(db)
+    assert call.reminders_sent == 1  # 15-minute one not due yet
+    call.notified_at = now - timedelta(minutes=16)
+    call.is_read = True  # owner opened it
+    db.commit()
+    before = len(no_side_effects["push"])
+    run_due_jobs(db)
+    assert len(no_side_effects["push"]) == before
+
+
+def test_short_calls_are_free(db, monkeypatch):
+    account = make_account(db)
+    call = Call(account_id=account.id, kind="agent", duration_seconds=12)
+    db.add(call)
+    db.commit()
+    monkeypatch.setattr("stripe.billing.MeterEvent.create", lambda **kw: (_ for _ in ()).throw(AssertionError))
+    billing.report_usage(db, call)
+    assert call.usage_reported and call.billed_minutes == 0
+
+
+def test_email_backup_when_no_push(db, no_side_effects):
+    from app.push import notify_call
+    account = make_account(db)
+    call = Call(account_id=account.id, kind="agent", caller_name="Bob", job_description="Fix gate", status="complete")
+    db.add(call)
+    db.commit()
+    notify_call(db, call)
+    assert no_side_effects["emails"][-1][1] == "New call: Bob" and "Fix gate" in no_side_effects["emails"][-1][2]

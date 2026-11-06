@@ -7,7 +7,6 @@
   <p class="muted">Your assistant uses this to answer calls in your name. You can change it any time.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" action="/app/onboarding" class="card">
-    {% set show_area_code = true %}
     {% include "_business_fields.html" %}
     <p></p>
     <button class="btn block">Continue</button>

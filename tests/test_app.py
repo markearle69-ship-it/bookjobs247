@@ -22,16 +22,31 @@ def test_signup_onboarding_then_subscribe(client, db):
     assert "£25" in page.text and "£0.20" in page.text and "60 answered minutes" in page.text
 
 
-def test_us_onboarding_requires_area_code(client, db):
+def test_us_area_code_comes_from_owner_phone(client, db):
     client.post("/signup", data={"email": "a@b.com", "password": "password1", "business_name": "Cool Air",
                                  "country": "US"})
-    data = {"owner_name": "Al", "trade_key": "hvac", "owner_phone": "5551234567"}
-    r = client.post("/app/onboarding", data=data, follow_redirects=False)
-    assert r.status_code == 200 and "area code" in r.text
-    assert 'value="Al"' in r.text  # what they typed is kept
-    r = client.post("/app/onboarding", data=data | {"area_code": "512"}, follow_redirects=False)
+    r = client.post("/app/onboarding", data={"owner_name": "Al", "trade_key": "hvac"}, follow_redirects=False)
+    assert r.status_code == 200 and "phone number" in r.text and 'value="Al"' in r.text  # typed values kept
+    r = client.post("/app/onboarding", data={"owner_name": "Al", "trade_key": "hvac", "owner_phone": "(512) 555-0100"},
+                    follow_redirects=False)
     assert r.headers["location"] == "/app/subscribe"
     assert db.query(Account).one().area_code == "512"
+
+
+def test_add_missing_columns(tmp_path):
+    from sqlalchemy import create_engine, inspect, text
+
+    from app.migrate import add_missing_columns
+    eng = create_engine(f"sqlite:///{tmp_path}/old.db")
+    with eng.begin() as c:  # an "old" calls table missing newer columns
+        c.execute(text("CREATE TABLE calls (id INTEGER PRIMARY KEY, account_id INTEGER, kind VARCHAR(16))"))
+        c.execute(text("INSERT INTO calls (account_id, kind) VALUES (1, 'agent')"))
+    added = add_missing_columns(eng)
+    assert "calls.reminders_sent" in added
+    cols = {c["name"] for c in inspect(eng).get_columns("calls")}
+    assert {"followup_due_at", "notified", "urgency"} <= cols
+    with eng.begin() as c:
+        assert c.execute(text("SELECT reminders_sent, notified FROM calls")).one() == (0, 0)
 
 
 def test_other_trade_free_text(client, db):

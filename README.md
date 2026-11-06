@@ -27,17 +27,40 @@ and can see every call in a phone-friendly app. A one-tap **ON/OFF** switch
 sends missed calls to a plain voicemail instead.
 
 Self-serve: sign up → business details (trade, greeting name, assistant name,
-voice, US area code) → pay (Stripe) → number assigned automatically → one-tap
-forwarding codes → done.
+voice) → pay (Stripe) → number assigned automatically → one-tap forwarding
+codes → done.
 
 | | US | UK |
 |---|---|---|
 | Price | $29/month | £25/month |
 | Included | 60 answered minutes | 60 answered minutes |
 | Overage | $0.25/min (metered) | £0.20/min (metered) |
-| Number | Local number in their area code, bought instantly | 07 mobile number from your pre-bought pool |
+| Number | Bought instantly (owner's area code if available) | 07 mobile number from your pre-bought pool |
 
-Voicemail (when the assistant is OFF, or as a fallback) is never billed.
+Voicemail (when the assistant is OFF, or as a fallback) and calls under 20
+seconds (robocalls, instant hang-ups) are never billed.
+
+The Call Keeper number is **never seen by callers**: they dial the owner's
+usual number, and the owner's phone forwards unanswered calls to it. It only
+has to be in the same country as the owner's phone (forwarding abroad costs
+the owner money).
+
+### Built-in safeguards (to keep support low)
+- **Caller ID problems:** if the network passes the owner's own number, or
+  "anonymous", as the caller, the assistant is told to collect and read back a
+  callback number.
+- **Alerts survive restarts:** missed-call wrap-ups and emergency re-alerts
+  are stored in the database and run by a background loop every 30 seconds.
+- **Email backup:** every call is emailed if the owner has no push
+  notifications set up, and emergencies are always emailed.
+- **Forwarding never set up:** if a number gets no calls in its first 3 days,
+  the owner is emailed the setup link once.
+- **Cancellation:** the number stays connected for 7 days. Callers reach
+  voicemail, and each call sends the owner a "You missed a call" email with a
+  one-tap restart (same number, no setup) and the code to turn forwarding off.
+  After 7 days the number is released.
+- **Schema upgrades:** new columns are added automatically on deploy
+  (`app/migrate.py`).
 
 ## How a call flows
 
@@ -79,77 +102,88 @@ Some details of the design:
 
 ## Go-live checklist
 
-### 1. Deploy to Railway
-1. Create a Railway project, then **Deploy from GitHub repo** and pick this repo.
-   It builds from the `Dockerfile` (healthcheck: `/healthz`).
-2. Add a **Postgres** service. On the app service, set
+Accounts you need (all pay-as-you-go): **Railway** (hosting, ~$5–20/mo),
+**Twilio** (numbers + call minutes), **Retell** (the AI voice), **Stripe**
+(billing), **Postmark** (email, free tier to start), and the **onthetools.com**
+domain. Do everything in test mode first (step 8), then switch Stripe to live.
+
+### 1. Domain + hosting (Railway)
+1. Buy `onthetools.com`.
+2. Railway: New project → **Deploy from GitHub repo** → this repo (it builds
+   from the `Dockerfile`; healthcheck `/healthz`). Pick the branch you deploy.
+3. Add a **Postgres** service; on the app service set
    `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
-3. Generate a domain (or add your own), then set `PUBLIC_BASE_URL` to it.
-4. Set `SECRET_KEY`, `ADMIN_PASSWORD` and `ADMIN_EMAIL` (see `.env.example`).
+4. Settings → Networking → **Custom domain** `onthetools.com` (and
+   `www.onthetools.com`); add the DNS records Railway shows at your registrar.
+5. Set `PUBLIC_BASE_URL=https://onthetools.com`, `SECRET_KEY` and
+   `ADMIN_PASSWORD` (long random strings), `ADMIN_EMAIL`, `SUPPORT_EMAIL`.
 
-Tables are created automatically on first start.
+Tables are created (and later upgraded) automatically on start.
 
-### 2. Push notification keys
+### 2. Email (Postmark)
+Create a server, verify `onthetools.com` as a sender domain (DNS records), and
+set `POSTMARK_API_TOKEN` and `EMAIL_FROM=hello@onthetools.com`. Email carries
+password resets, "number ready", backup call alerts and win-back emails, so
+do this before taking customers.
+
+### 3. Push notification keys
 ```bash
 python scripts/generate_vapid_keys.py
 ```
-Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`. **Never change
-them later**, or every owner has to turn notifications on again.
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:hello@onthetools.com`.
+**Never change them later**, or every owner has to re-enable notifications.
 
-### 3. Email (password resets, "your number is ready")
-Set `POSTMARK_API_TOKEN` + `EMAIL_FROM` (or the SMTP settings).
-
-### 4. Stripe
-1. Run the setup script once in **test mode**, then again in live mode:
-   ```bash
-   STRIPE_SECRET_KEY=sk_test_... python scripts/setup_stripe.py
-   ```
-   It creates the meter (`agent_minutes`), the product, and a flat price plus
-   a graduated metered price per currency, then prints the four
-   `STRIPE_PRICE_*` values to set.
-2. In Stripe go to **Developers → Webhooks → Add endpoint**:
-   `https://<your-domain>/webhooks/stripe`, with these events:
-   `checkout.session.completed`, `customer.subscription.created`,
-   `customer.subscription.updated`, `customer.subscription.deleted`.
-   Set `STRIPE_WEBHOOK_SECRET` from it.
-3. In **Settings → Billing → Customer portal**, turn on cancellation and
-   payment-method updates. This is what "Manage payment, invoices or cancel"
-   opens.
+### 4. Twilio
+1. Upgrade the account from trial (add a card). Trial accounts can't buy
+   numbers for customers.
+2. Set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`.
+3. **Voice → Settings → Geo permissions**: allow the US and UK.
+4. **US numbers need nothing else.** They're bought automatically when a
+   customer pays (voice only, so no A2P/10DLC registration is needed).
+5. **UK:** Phone Numbers → Regulatory Compliance → create a **Bundle** for
+   *your* business (UK mobile, business end user, company documents and
+   address). Approval takes 1–3 days. Then buy 5–10 UK **mobile** (07)
+   numbers under it and add each one in `/admin` → UK number pool. You get
+   an email if the pool runs out.
 
 ### 5. Retell
-1. Set `RETELL_API_KEY`. It is used both for API calls and to verify webhook
-   signatures.
-2. Pick voices and create the four agents:
+1. Set `RETELL_API_KEY`. It's used for API calls and to verify webhooks.
+2. Pick four voices and create the agents:
    ```bash
    python scripts/setup_retell.py --list-voices
    python scripts/setup_retell.py --us-female <id> --us-male <id> --gb-female <id> --gb-male <id>
    ```
-   Set the four printed `RETELL_AGENT_ID_*` values. A missing male voice falls
-   back to that country's female agent. The agents
-   have their webhook (`/webhooks/retell`), post-call analysis fields and a
-   10-minute call cap configured.
-3. To change the script later, edit `app/agent_prompt.py`, then run
-   `python scripts/setup_retell.py --update`.
+   Set the four printed `RETELL_AGENT_ID_*` values. Run this *after*
+   `PUBLIC_BASE_URL` is set, because it stores the webhook URL on the agents.
 
-### 6. Twilio
-1. Set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. US numbers are bought
-   automatically at signup and pointed at `/twilio/voice`.
-2. **UK pool:** get a UK regulatory bundle approved for your own business,
-   buy a handful of UK numbers under it, then add each one in `/admin`. The
-   admin page warns when fewer than 3 are free, and you get an email if a
-   signup finds the pool empty. Adding a number automatically serves anyone
-   who was waiting.
-3. Make sure your Twilio account has **Voice → Settings → Geo permissions**
-   that allow the SIP dial to Retell. Twilio voice transcription (used for
-   voicemails) is enabled by default.
+### 6. Stripe
+1. In **test mode**: `STRIPE_SECRET_KEY=sk_test_... python scripts/setup_stripe.py`
+   and set the four printed `STRIPE_PRICE_*` values.
+2. Developers → Webhooks → Add endpoint `https://onthetools.com/webhooks/stripe`
+   with events `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted`. Set
+   `STRIPE_WEBHOOK_SECRET`.
+3. Settings → Billing → **Customer portal**: enable cancel + update payment
+   method.
 
-### 7. End-to-end test (Stripe test mode)
-Sign up at `/signup` with a test card (`4242 4242 4242 4242`), forward a phone to the
-number, and call it from another phone without answering. Check that:
-- the agent answers in your business's name
-- the call appears in `/app` with the details, and you get a push notification
-- the minutes appear in Stripe on the meter
-- after you flip the switch OFF, you hear the voicemail greeting instead.
+### 7. Run the setup scripts somewhere
+The scripts in steps 3, 5 and 6 need the env vars. Easiest: Railway → app
+service → **⋯ → Shell** (or `railway run python scripts/...` locally).
+
+### 8. End-to-end test (Stripe test mode)
+1. Sign up at `https://onthetools.com/signup`, pay with card `4242 4242 4242 4242`.
+2. On your own mobile, tap **Turn on forwarding** on the Setup page.
+3. From another phone, ring your mobile and don't answer. The assistant
+   should answer as your business and ask your trade's questions.
+4. Check: the call appears in the app, you get a notification (add the app to
+   your home screen first), and the minutes show on the Stripe meter.
+5. Flip the switch OFF and call again: you should get voicemail.
+6. Cancel from Settings → Manage billing. You should get the "plan ended"
+   email, and a call should give the win-back email.
+
+### 9. Go live
+Re-run step 6 with your **live** Stripe key (new prices, new webhook secret),
+swap those env vars, and you're open.
 
 ## Admin (`/admin`)
 - Customers: subscription status, number, ON/OFF, calls/minutes (30 days),
@@ -173,13 +207,11 @@ at `<url>/twilio/voice`.
 `scripts/make_icons.py` regenerates the app icons.
 
 ## Known limits / next steps
-- Tables come from `create_all`. Add Alembic before making schema changes
-  to a live database.
-- The "missed call" follow-up timers run in-process, so a restart in the
-  ~2 minutes after a call can skip one fallback notification. The call is
-  still saved.
-- iPhone push notifications need iOS 16.4+ and the app added to the home
-  screen. The dashboard explains this when it detects an iPhone.
-- Cancelled customers are reminded to turn off forwarding, but the app
-  can't do it for them. US numbers are released when the subscription ends.
-  UK pool numbers return to the pool after a 30-day cooldown.
+- The background-job loop runs inside the web process. Run **one** instance
+  (Railway's default). Scaling to several needs a lock or a separate worker.
+- iPhone push needs iOS 16.4+ and the app added to the home screen. Email
+  covers owners who don't.
+- `app/migrate.py` only adds columns. Renames or type changes need a real
+  migration tool (Alembic).
+- Customers can't turn forwarding off from the app (only their phone can).
+  The cancellation emails tell them how.

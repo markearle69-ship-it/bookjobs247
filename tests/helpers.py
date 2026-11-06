@@ -35,18 +35,20 @@ def no_side_effects(monkeypatch):
     sent = []
     def fake_send(db, a, t, b, url="/app", urgent=False):
         sent.append((a.id, t, b, urgent))
-        return 1
+        return 1 if a.push_subscriptions else 0
 
     monkeypatch.setattr("app.push.send_to_account", fake_send)
     monkeypatch.setattr("app.routes_app.send_to_account", fake_send)
-    monkeypatch.setattr("app.emails.send_email", lambda *a, **k: True)
-    monkeypatch.setattr("app.activation.send_email", lambda *a, **k: True)
-    monkeypatch.setattr("app.routes_app.send_email", lambda *a, **k: True)
-    scheduled, reminders = [], []
-    monkeypatch.setattr("app.followups.schedule", lambda call_id, delay: scheduled.append((call_id, delay)))
-    monkeypatch.setattr("app.followups.schedule_emergency_reminder",
-                        lambda call_id, delay: reminders.append((call_id, delay)))
-    return {"push": sent, "scheduled": scheduled, "reminders": reminders}
+    emails = []
+
+    def fake_email(to, subject, body):
+        emails.append((to, subject, body))
+        return True
+
+    for mod in ("app.emails", "app.activation", "app.routes_app", "app.push", "app.followups",
+                "app.routes_webhooks"):
+        monkeypatch.setattr(f"{mod}.send_email", fake_email)
+    return {"push": sent, "emails": emails}
 
 
 def make_account(db, **kw):

@@ -59,16 +59,64 @@ def test_empty_pool_records_error(client, db, monkeypatch):
     assert "pool is empty" in account.provisioning_error
 
 
-def test_subscription_deleted_returns_pool_number(client, db, monkeypatch):
-    account = make_account(db, country="GB", twilio_number="+447700900001", twilio_number_sid="PN1")
+def test_cancellation_grace_period_winback_then_release(client, db, monkeypatch, no_side_effects):
+    from datetime import timedelta
+
+    from app.followups import run_due_jobs
+    from app.models import Call, utcnow
+    account = make_account(db, country="GB", twilio_number="+447700900001", twilio_number_sid="PN1",
+                           owner_phone="+447700900999")
     db.add(PoolNumber(phone_number="+447700900001", twilio_sid="PN1", account_id=account.id))
     db.commit()
     event = {"id": "evt_3", "type": "customer.subscription.deleted", "data": {"object": sub(status="canceled")}}
     send_event(client, monkeypatch, event)
     db.refresh(account)
+    # Number kept during the grace period; owner told how to restart or switch off forwarding.
+    assert account.twilio_number == "+447700900001" and account.cancelled_at is not None
+    assert no_side_effects["emails"][-1][1].endswith("plan has ended") and "##004#" in no_side_effects["emails"][-1][2]
+
+    # A forwarded call reaches voicemail and triggers a win-back email, not a push.
+    r = client.post("/twilio/voice", data={"To": "+447700900001", "From": "+447700111222", "CallSid": "CA1"})
+    assert "<Record" in r.text
+    client.post("/twilio/recording", data={"CallSid": "CA1", "RecordingUrl": "https://api.twilio.com/r/RE1",
+                                           "RecordingDuration": "9"})
+    assert no_side_effects["emails"][-1][1].startswith("You missed a call") and not no_side_effects["push"]
+    assert "/app/subscribe" in no_side_effects["emails"][-1][2]
+
+    # After 7 days the pool number goes back.
+    account.cancelled_at = utcnow() - timedelta(days=8)
+    db.commit()
+    run_due_jobs(db)
+    db.refresh(account)
     pool = db.query(PoolNumber).one()
-    assert account.twilio_number is None and account.subscription_status == "canceled"
-    assert pool.account_id is None and pool.released_at is not None
+    assert account.twilio_number is None and pool.account_id is None and pool.released_at is not None
+    assert "switched off" in no_side_effects["emails"][-1][1]
+
+
+def test_restart_during_grace_keeps_number(client, db, monkeypatch):
+    from app.models import utcnow
+    account = make_account(db, subscription_status="canceled", cancelled_at=utcnow())
+    send_event(client, monkeypatch, {"id": "evt_9", "type": "customer.subscription.created",
+                                     "data": {"object": sub() | {"id": "sub_2"}}})
+    db.refresh(account)
+    assert account.is_active and account.cancelled_at is None and account.twilio_number == "+15557654321"
+    # A late 'deleted' for the OLD subscription must not cancel the new one.
+    send_event(client, monkeypatch, {"id": "evt_10", "type": "customer.subscription.deleted",
+                                     "data": {"object": sub(status="canceled")}})
+    db.refresh(account)
+    assert account.is_active and account.cancelled_at is None
+
+
+def test_forwarding_nudge_after_3_quiet_days(db, no_side_effects):
+    from datetime import timedelta
+
+    from app.followups import run_due_jobs
+    from app.models import utcnow
+    account = make_account(db, number_assigned_at=utcnow() - timedelta(days=4))
+    run_due_jobs(db)
+    run_due_jobs(db)
+    nudges = [e for e in no_side_effects["emails"] if "haven't had any calls" in e[1]]
+    assert len(nudges) == 1 and account.forwarding_nudge_sent_at is not None
 
 
 def test_past_due_keeps_number(client, db, monkeypatch):

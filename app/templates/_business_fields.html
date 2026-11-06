@@ -24,12 +24,6 @@
 <input id="owner_phone" name="owner_phone" type="tel" required value="{{ account.owner_phone | pretty }}" autocomplete="tel"
        placeholder="{{ '07700 900123' if account.country == 'GB' else '(555) 123-4567' }}">
 
-{% if show_area_code and account.country == 'US' %}
-<label for="area_code">Area code for your new local number <span class="hint">– so customers see a local number</span></label>
-<input id="area_code" name="area_code" inputmode="numeric" pattern="[0-9]{3}" maxlength="3" required
-       value="{{ account.area_code or '' }}" placeholder="e.g. 512">
-{% endif %}
-
 <h3 style="margin-top:22px">How your assistant answers</h3>
 <label for="answer_as">Name to answer the phone as</label>
 <input id="answer_as" name="answer_as" maxlength="200" value="{{ account.answer_as or '' }}"

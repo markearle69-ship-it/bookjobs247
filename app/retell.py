@@ -55,7 +55,12 @@ def _fill_safety(text: str, safety: dict) -> str:
     return text
 
 
-def dynamic_variables(account: Account, trade=None) -> dict[str, str]:
+CALLER_KNOWN = "If they say to use the number they're calling from, that's fine."
+CALLER_UNKNOWN = ("Their number did NOT come through on this call, so you must get a callback number and read it "
+                  "back digit by digit. Do not accept 'this number'.")
+
+
+def dynamic_variables(account: Account, trade=None, caller_known: bool = True) -> dict[str, str]:
     """`trade` is the account's TradeTemplate row, or None for "other"."""
     from .trades import OTHER_EMERGENCY, OTHER_QUESTIONS
 
@@ -71,6 +76,7 @@ def dynamic_variables(account: Account, trade=None) -> dict[str, str]:
         "services": account.services or "general work",
         "service_area": account.service_area or "the local area",
         "business_hours": account.business_hours or "not specified",
+        "callback_rule": CALLER_KNOWN if caller_known else CALLER_UNKNOWN,
         "trade_questions": _fill_safety(questions, safety),
         "emergency_signs": _fill_safety(emergency, safety),
         **safety,
@@ -78,7 +84,7 @@ def dynamic_variables(account: Account, trade=None) -> dict[str, str]:
 
 
 def register_phone_call(account: Account, from_number: str, to_number: str, call_row_id: int,
-                        twilio_call_sid: str, trade=None) -> str:
+                        twilio_call_sid: str, trade=None, caller_known: bool = True) -> str:
     """Returns the Retell call_id to dial. Raises RetellError on any failure
     so the caller can fall back to voicemail instead of dropping the call."""
     agent_id = agent_id_for(account.country, account.voice_gender)
@@ -90,7 +96,7 @@ def register_phone_call(account: Account, from_number: str, to_number: str, call
         "to_number": to_number,
         "direction": "inbound",
         "metadata": {"account_id": account.id, "call_row_id": call_row_id, "twilio_call_sid": twilio_call_sid},
-        "retell_llm_dynamic_variables": dynamic_variables(account, trade),
+        "retell_llm_dynamic_variables": dynamic_variables(account, trade, caller_known),
     }
     try:
         # Short timeout: the caller is listening to silence while this runs.

@@ -19,6 +19,9 @@ from .plans import stripe_prices_for
 
 log = logging.getLogger(__name__)
 
+# Calls shorter than this are never charged.
+FREE_CALL_SECONDS = 20
+
 
 def _configure() -> None:
     stripe.api_key = settings.stripe_secret_key
@@ -72,6 +75,8 @@ def sync_subscription(account: Account, sub) -> None:
         end = items[0].get("current_period_end")
     account.current_period_start = _ts(start)
     account.current_period_end = _ts(end)
+    if account.is_active:
+        account.cancelled_at = None  # restarted (possibly within the grace period: same number kept)
 
 
 def retrieve_subscription(subscription_id: str):
@@ -94,6 +99,12 @@ def confirm_checkout(db: Session, session_id: str, account: Account) -> bool:
 def report_usage(db: Session, call: Call) -> None:
     """Send this call's minutes to the Stripe meter, once."""
     if call.usage_reported or call.kind != "agent" or call.duration_seconds <= 0:
+        return
+    if call.duration_seconds < FREE_CALL_SECONDS:
+        # Robocalls, wrong numbers and instant hang-ups don't use the owner's minutes.
+        call.billed_minutes = 0
+        call.usage_reported = True
+        db.commit()
         return
     account = call.account
     if not account.stripe_customer_id:

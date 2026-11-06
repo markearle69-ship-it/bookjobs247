@@ -6,12 +6,17 @@
   <h1>Start your plan</h1>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   {% if account.subscription_status == 'canceled' %}
-    <div class="notice">Your previous plan has ended. Restart it below to get a number again.</div>
+    {% if account.twilio_number %}
+    <div class="notice">Your plan has ended, but your {{ settings.app_name }} number {{ account.twilio_number | pretty }}
+      is still connected for a few more days. Restart now to keep the same number. No setup needed.</div>
+    {% else %}
+    <div class="notice">Your previous plan has ended. Restart below and we'll give you a new number.</div>
+    {% endif %}
   {% endif %}
   <div class="card">
     <div class="price">{{ plan.monthly_label }}<small>/month</small></div>
     <ul>
-      <li>Your own {{ 'UK' if account.country == 'GB' else 'US' }} number for missed calls</li>
+      <li>Keep your own number: missed calls forward to your assistant</li>
       <li>AI assistant answers 24/7 and takes the full job details</li>
       <li>{{ plan.included_minutes }} answered minutes included, then {{ plan.overage_label }}/minute</li>
       <li>Free voicemail with transcripts when the assistant is switched off</li>

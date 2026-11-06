@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -10,6 +12,8 @@ from .db import Base, SessionLocal, engine
 from .routes_admin import router as admin_router
 from .routes_app import router as app_router
 from .routes_webhooks import router as webhooks_router
+from .followups import run_forever
+from .migrate import add_missing_columns
 from .trades import seed_trades
 from .web import LoginRequired, RedirectTo
 
@@ -19,10 +23,20 @@ if not settings.secret_key:
     raise RuntimeError("SECRET_KEY must be set (any long random string)")
 
 Base.metadata.create_all(bind=engine)
+add_missing_columns(engine)
 with SessionLocal() as _db:
     seed_trades(_db)
 
-app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Background jobs: missed-call wrap-ups, emergency re-alerts, forwarding
+    # nudges, releasing numbers after a cancellation grace period.
+    task = asyncio.create_task(run_forever())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(webhooks_router)
 app.include_router(app_router)

@@ -16,8 +16,8 @@ def test_agent_on_dials_retell_with_business_details(client, db, monkeypatch):
     account = make_account(db)
     captured = {}
 
-    def fake_register(acct, from_number, to_number, row_id, sid, trade=None):
-        captured.update(vars=retell.dynamic_variables(acct, trade), row_id=row_id, sid=sid)
+    def fake_register(acct, from_number, to_number, row_id, sid, trade=None, caller_known=True):
+        captured.update(vars=retell.dynamic_variables(acct, trade, caller_known), row_id=row_id, sid=sid)
         return "call_abc"
 
     monkeypatch.setattr(retell, "register_phone_call", fake_register)
@@ -37,7 +37,7 @@ def test_agent_on_dials_retell_with_business_details(client, db, monkeypatch):
 
 def test_agent_off_goes_to_voicemail(client, db, monkeypatch):
     make_account(db, agent_enabled=False)
-    monkeypatch.setattr(retell, "register_phone_call", lambda *a: (_ for _ in ()).throw(AssertionError("no")))
+    monkeypatch.setattr(retell, "register_phone_call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no")))
     r = post_voice(client)
     assert "<Record" in r.text and "Joe's Plumbing" in r.text
     assert db.query(Call).one().kind == "voicemail"
@@ -52,7 +52,7 @@ def test_past_due_goes_to_voicemail(client, db, monkeypatch):
 def test_retell_failure_falls_back_to_voicemail(client, db, monkeypatch):
     make_account(db)
 
-    def boom(*a):
+    def boom(*a, **k):
         raise retell.RetellError("down")
 
     monkeypatch.setattr(retell, "register_phone_call", boom)
@@ -63,7 +63,7 @@ def test_retell_failure_falls_back_to_voicemail(client, db, monkeypatch):
 
 def test_failed_dial_falls_back_to_voicemail(client, db, monkeypatch):
     make_account(db)
-    monkeypatch.setattr(retell, "register_phone_call", lambda *a: "call_x")
+    monkeypatch.setattr(retell, "register_phone_call", lambda *a, **k: "call_x")
     post_voice(client)
     r = client.post("/twilio/dial-done", data={"CallSid": "CA1", "DialCallStatus": "failed"})
     assert "<Record" in r.text
@@ -86,13 +86,22 @@ def test_voicemail_recording_and_transcription(client, db, no_side_effects):
 
 
 def test_hangup_before_message_is_marked_missed(client, db, no_side_effects):
+    from datetime import timedelta
+
+    from app.followups import MISSED_SUMMARY, run_due_jobs
+    from app.models import utcnow
     make_account(db, agent_enabled=False)
     post_voice(client)
     client.post("/twilio/status", data={"CallSid": "CA1", "CallStatus": "completed"})
-    assert no_side_effects["scheduled"]
-    from app.followups import MISSED_SUMMARY, finalize
-    finalize(no_side_effects["scheduled"][0][0])
     call = db.query(Call).one()
+    db.refresh(call)
+    assert call.followup_due_at is not None and not call.notified  # stored, survives restarts
+    run_due_jobs(db)
+    db.refresh(call)
+    assert not call.notified  # not due yet
+    call.followup_due_at = utcnow() - timedelta(seconds=1)
+    db.commit()
+    run_due_jobs(db)
     db.refresh(call)
     assert call.summary == MISSED_SUMMARY and call.notified
 
@@ -122,3 +131,21 @@ def test_other_trade_uses_generic_questions(db):
     a = make_account(db, trade_key="other", trade="Window cleaner")
     v = retell.dynamic_variables(a, None)
     assert v["trade_questions"] == OTHER_QUESTIONS and v["trade"] == "Window cleaner"
+
+
+def test_owner_number_as_caller_id_is_treated_as_unknown(client, db, monkeypatch):
+    make_account(db, owner_phone="+15550001111")
+    seen = {}
+
+    def fake_register(acct, from_number, to_number, row_id, sid, trade=None, caller_known=True):
+        seen["vars"] = retell.dynamic_variables(acct, trade, caller_known)
+        return "call_" + sid
+
+    monkeypatch.setattr(retell, "register_phone_call", fake_register)
+    client.post("/twilio/voice", data={"To": "+15557654321", "From": "+15550001111", "CallSid": "CA9"})
+    assert db.query(Call).one().from_number == ""
+    assert "did NOT come through" in seen["vars"]["callback_rule"]
+    client.post("/twilio/voice", data={"To": "+15557654321", "From": "anonymous", "CallSid": "CA10"})
+    assert "did NOT come through" in seen["vars"]["callback_rule"]
+    client.post("/twilio/voice", data={"To": "+15557654321", "From": "+15551112222", "CallSid": "CA11"})
+    assert "that's fine" in seen["vars"]["callback_rule"]

@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 
 from . import billing, followups, retell, telephony
 from .activation import ensure_number
+from .emails import send_email
 from .config import settings
 from .db import get_db
 from .models import Account, Call, TradeTemplate, utcnow
+from .phone import normalize
 from .push import notify_call
 
 log = logging.getLogger(__name__)
@@ -53,9 +55,14 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
     if account.first_call_at is None:
         account.first_call_at = utcnow()
 
+    # Some networks pass the owner's own number (or "anonymous") as the
+    # caller ID on forwarded calls. Then we don't know who called, so the
+    # assistant is told to get and confirm a callback number.
+    caller_known = _real_caller_id(from_number, account)
     call = db.query(Call).filter(Call.twilio_call_sid == call_sid).first() if call_sid else None
     if call is None:
-        call = Call(account_id=account.id, kind="agent", twilio_call_sid=call_sid, from_number=from_number)
+        call = Call(account_id=account.id, kind="agent", twilio_call_sid=call_sid,
+                    from_number=from_number if caller_known else "")
         db.add(call)
         db.commit()
 
@@ -66,7 +73,8 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
 
     try:
         trade = db.get(TradeTemplate, account.trade_key) if account.trade_key else None
-        retell_call_id = retell.register_phone_call(account, from_number, to_number, call.id, call_sid, trade)
+        retell_call_id = retell.register_phone_call(account, from_number, to_number, call.id, call_sid, trade,
+                                                    caller_known=caller_known)
     except retell.RetellError as exc:
         log.error("Retell register failed for account %s, falling back to voicemail: %s", account.id, exc)
         return _start_voicemail(db, call, account)
@@ -74,6 +82,15 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
     call.retell_call_id = retell_call_id
     db.commit()
     return _twiml(telephony.twiml_dial_agent(retell.sip_uri(retell_call_id)))
+
+
+def _real_caller_id(from_number: str, account: Account) -> bool:
+    if not from_number or not from_number.startswith("+"):
+        return False  # "anonymous", "Restricted", etc.
+    digits = from_number.lstrip("+")
+    if len(digits) < 8 or len(set(digits)) <= 2:
+        return False  # placeholder numbers some carriers use for withheld IDs
+    return normalize(from_number, account.country) not in (account.owner_phone, account.twilio_number)
 
 
 @router.post("/twilio/dial-done")
@@ -112,7 +129,7 @@ async def twilio_recording(request: Request, db: Session = Depends(get_db)):
     call.status = "complete"
     db.commit()
     if duration <= 0:
-        followups.finalize(call.id)
+        followups.finalize(db, call)
     else:
         notify_call(db, call)
     return Response(status_code=204)
@@ -141,7 +158,7 @@ async def twilio_status(request: Request, db: Session = Depends(get_db)):
     if form.get("CallStatus") in ("completed", "busy", "failed", "no-answer", "canceled"):
         call = db.query(Call).filter(Call.twilio_call_sid == form.get("CallSid", "")).first()
         if call and not call.notified:
-            followups.schedule(call.id, 90)
+            followups.schedule(db, call, 90)
     return Response(status_code=204)
 
 
@@ -197,7 +214,7 @@ async def retell_webhook(request: Request, db: Session = Depends(get_db)):
         notify_call(db, call)
     elif event == "call_ended":
         # Fallback in case analysis never arrives.
-        followups.schedule(call.id, 120)
+        followups.schedule(db, call, 120)
     return Response(status_code=204)
 
 
@@ -227,15 +244,39 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     elif etype in ("customer.subscription.created", "customer.subscription.updated",
                    "customer.subscription.deleted"):
         account = db.query(Account).filter(Account.stripe_customer_id == obj.get("customer")).first()
-        if account:
+        ended = etype == "customer.subscription.deleted" or obj.get("status") in ("canceled", "incomplete_expired")
+        # A late event about an old subscription must not override a newer, active one.
+        stale = (account is not None and account.is_active and account.stripe_subscription_id
+                 and obj.get("id") != account.stripe_subscription_id and ended)
+        if account and not stale:
+            was_active = account.is_active
             billing.sync_subscription(account, obj)
-            db.commit()
-            # Past-due/unpaid accounts keep their number (calls go to voicemail
-            # until they pay); only a fully ended subscription gives it up.
-            if etype == "customer.subscription.deleted" or obj.get("status") in ("canceled", "incomplete_expired"):
-                telephony.release_number(db, account)
+            if ended:
+                # Keep the number for a grace period: missed calls still reach
+                # voicemail and the owner gets a win-back email for each one.
+                # followups.run_due_jobs releases it afterwards.
+                if account.cancelled_at is None and account.twilio_number:
+                    account.cancelled_at = utcnow()
+                    db.commit()
+                    if was_active:
+                        _cancellation_email(account)
             else:
+                # Past-due/unpaid accounts keep their number (calls go to voicemail until they pay).
+                db.commit()
                 ensure_number(db, account)
 
     db.commit()
     return {"ok": True}
+
+
+def _cancellation_email(account: Account) -> None:
+    from .forwarding import off_code_hint
+    send_email(
+        account.email, f"Your {settings.app_name} plan has ended",
+        f"Hi {account.owner_name or 'there'},\n\n"
+        f"Your {settings.app_name} plan has ended. Your phone may still be forwarding missed calls to your\n"
+        f"{settings.app_name} number, so for the next 7 days those callers will reach a voicemail and we'll email\n"
+        f"you about each one, so you don't lose them.\n\n"
+        f"Changed your mind? Restart in one tap, same number, no setup: {settings.url('/app/subscribe')}\n\n"
+        f"Otherwise, please turn off call forwarding on your phone: {off_code_hint(account.country)}\n"
+        f"After 7 days the number is switched off.\n")

@@ -6,7 +6,7 @@ customer's agent at once. Per-trade questions are edited in /admin/trades
 and need no update run."""
 
 DYNAMIC_VARIABLES = [
-    "greeting", "answer_as", "assistant_name", "owner_name", "trade", "services", "service_area",
+    "greeting", "callback_rule", "answer_as", "assistant_name", "owner_name", "trade", "services", "service_area",
     "business_hours", "trade_questions", "emergency_signs", "emergency_number", "gas_emergency",
 ]
 
@@ -26,8 +26,8 @@ About the business (use only to understand the caller - never invent details):
 
 Collect, one question at a time, in a natural, friendly way:
 1. The caller's name.
-2. The best number to call them back on. If they say "this number", that's fine. If they give a
-   different number, read it back digit by digit to confirm.
+2. The best number to call them back on. {{callback_rule}} If they give a number, read it back
+   digit by digit to confirm.
 3. The address, or at least the area and postcode/ZIP, where the work is needed.
 4. What the job is. Ask these questions for this trade, skipping any the caller has already answered:
 {{trade_questions}}

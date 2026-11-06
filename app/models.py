@@ -54,8 +54,15 @@ class Account(Base):
     twilio_number: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     twilio_number_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     provisioning_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    number_assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Set the first time a call reaches their number, i.e. forwarding works.
     first_call_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # "You haven't set up forwarding yet" email, sent once if no calls arrive.
+    forwarding_nudge_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # When the subscription ended. The number stays connected for a short
+    # grace period (calls go to voicemail and the owner is emailed a
+    # win-back), then it is released.
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Billing.
     stripe_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
@@ -114,6 +121,12 @@ class Call(Base):
     billed_minutes: Mapped[int] = mapped_column(Integer, default=0)
     usage_reported: Mapped[bool] = mapped_column(Boolean, default=False)
     notified: Mapped[bool] = mapped_column(Boolean, default=False)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Background jobs (stored, so they survive restarts/deploys):
+    # when to make sure this call is wrapped up and notified even if a
+    # webhook never arrives, and how many emergency re-alerts were sent.
+    followup_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    reminders_sent: Mapped[int] = mapped_column(Integer, default=0)
 
     # Owner workflow.
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)

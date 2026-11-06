@@ -70,3 +70,9 @@ def codes_for(country: str, number: str) -> list[dict]:
             "note": c.note,
         })
     return out
+
+
+def off_code_hint(country: str) -> str:
+    if country == "GB":
+        return "dial ##004# and press call."
+    return "dial ##004# and press call (Verizon: dial *73). Landline/VoIP: switch it off in your provider's settings."

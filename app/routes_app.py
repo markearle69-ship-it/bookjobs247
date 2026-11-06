@@ -184,7 +184,7 @@ def _details_ctx(db: Session, account: Account, **extra) -> dict:
     return {"account": account, "trades": grouped_trades(db), **extra}
 
 
-def _apply_business_details(db: Session, account: Account, form, include_area_code: bool) -> str | None:
+def _apply_business_details(db: Session, account: Account, form) -> str | None:
     """Copy the business-details form onto the account. Returns an error
     message if something required is missing, else None."""
     def f(name: str, limit: int) -> str:
@@ -206,9 +206,11 @@ def _apply_business_details(db: Session, account: Account, form, include_area_co
     account.service_area = f("service_area", 255)
     account.business_hours = f("business_hours", 255)
     account.owner_phone = normalize(f("owner_phone", 40), account.country)[:32]
-    if include_area_code and account.country == "US":
-        digits = "".join(ch for ch in f("area_code", 10) if ch.isdigit())
-        account.area_code = digits if len(digits) == 3 else ""
+    # Callers never see the Call Keeper number (they dial the owner's own
+    # number, which forwards), so it doesn't need to be local. For US numbers
+    # we still try the owner's own area code first, then fall back to any.
+    if account.country == "US" and account.owner_phone.startswith("+1") and len(account.owner_phone) == 12:
+        account.area_code = account.owner_phone[2:5]
 
     missing = []
     if not account.owner_name:
@@ -217,8 +219,6 @@ def _apply_business_details(db: Session, account: Account, form, include_area_co
         missing.append("your type of business")
     if not account.owner_phone:
         missing.append("your phone number")
-    if include_area_code and account.country == "US" and not account.area_code:
-        missing.append("a 3-digit area code for your local number")
     return f"Please fill in {', '.join(missing)}." if missing else None
 
 
@@ -230,7 +230,7 @@ def onboarding_form(request: Request, account: Account = Depends(require_account
 @router.post("/app/onboarding")
 async def onboarding(request: Request, account: Account = Depends(require_account), db: Session = Depends(get_db)):
     form = await request.form()
-    error = _apply_business_details(db, account, form, include_area_code=True)
+    error = _apply_business_details(db, account, form)
     if error:
         db.rollback()
         db.refresh(account)
@@ -386,7 +386,7 @@ def settings_page(request: Request, saved: int = 0, account: Account = Depends(r
 async def save_settings(request: Request, account: Account = Depends(require_ready_account),
                         db: Session = Depends(get_db)):
     form = await request.form()
-    error = _apply_business_details(db, account, form, include_area_code=False)
+    error = _apply_business_details(db, account, form)
     if error:
         db.rollback()
         db.refresh(account)

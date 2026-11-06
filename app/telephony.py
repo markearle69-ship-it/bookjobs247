@@ -52,6 +52,7 @@ def provision_number(db: Session, account: Account) -> str:
         number, sid = _buy_us_number(account)
     account.twilio_number = number
     account.twilio_number_sid = sid
+    account.number_assigned_at = utcnow()
     account.provisioning_error = None
     db.commit()
     return number
@@ -122,6 +123,7 @@ def release_number(db: Session, account: Account) -> None:
                 raise
     account.twilio_number = None
     account.twilio_number_sid = None
+    account.cancelled_at = None
     db.commit()
 
 
