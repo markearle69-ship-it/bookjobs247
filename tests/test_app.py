@@ -59,22 +59,22 @@ def test_other_trade_free_text(client, db):
 
 
 def test_trade_landing_pages(client, db):
-    r = client.get("/call-keeper/for/plumbers")
+    r = client.get("/call-capturer/for/plumbers")
     assert r.status_code == 200 and "for plumbers" in r.text and "stopcock" in r.text and "$29" in r.text
     assert "trade=plumber" in r.text
-    assert "£25" in client.get("/call-keeper/for/plumbers", headers={"accept-language": "en-GB,en;q=0.9"}).text
-    assert client.get("/call-keeper/for/nope").status_code == 404
+    assert "£25" in client.get("/call-capturer/for/plumbers", headers={"accept-language": "en-GB,en;q=0.9"}).text
+    assert client.get("/call-capturer/for/nope").status_code == 404
     old = client.get("/for/plumbers", follow_redirects=False)
-    assert old.status_code == 301 and old.headers["location"] == "/call-keeper/for/plumbers"
-    page = client.get("/call-keeper")
-    assert "$500+" in page.text and "/call-keeper/for/electricians" in page.text and "Call Keeper" in page.text
+    assert old.status_code == 301 and old.headers["location"] == "/call-capturer/for/plumbers"
+    page = client.get("/call-capturer")
+    assert "$500+" in page.text and "/call-capturer/for/electricians" in page.text and "Call Capturer" in page.text
 
 
 def test_umbrella_home_and_waitlist(client, db):
     from app.models import WaitlistSignup
     home = client.get("/")
-    assert "We do the admin." in home.text and "Call Keeper" in home.text and "Coming soon" in home.text
-    assert 'href="/call-keeper"' in home.text
+    assert "We do the admin." in home.text and "Call Capturer" in home.text and "Coming soon" in home.text
+    assert 'href="/call-capturer"' in home.text
     for _ in range(2):  # duplicate signup is ignored
         r = client.post("/waitlist", data={"email": "Pat@Example.com", "product": "quotes"}, follow_redirects=False)
         assert r.headers["location"] == "/?joined=quotes#tools"
@@ -86,7 +86,7 @@ def test_umbrella_home_and_waitlist(client, db):
 
 def test_manifest_uses_app_name(client):
     m = client.get("/manifest.webmanifest").json()
-    assert m["name"] == "Call Keeper" and m["start_url"] == "/app"
+    assert m["name"] == "Call Capturer" and m["start_url"] == "/app"
 
 
 def test_signup_from_trade_page_preselects_trade(client, db):

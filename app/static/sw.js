@@ -1,4 +1,4 @@
-/* Call Keeper service worker: push notifications for new calls. */
+/* Call Capturer service worker: push notifications for new calls. */
 self.addEventListener("install", function () { self.skipWaiting(); });
 self.addEventListener("activate", function (event) { event.waitUntil(self.clients.claim()); });
 

@@ -1,7 +1,7 @@
-# On The Tools · Call Keeper
+# On The Tools · Call Capturer
 
 **On The Tools** is the umbrella brand: one sales site listing a portfolio of
-low-cost apps that do the admin for local service businesses. **Call Keeper**
+low-cost apps that do the admin for local service businesses. **Call Capturer**
 is the first tool. Both names are settings (`BRAND_NAME`, `APP_NAME`,
 `PRODUCT_SLUG`), so renaming needs no code change.
 
@@ -10,17 +10,17 @@ Site map (one deployment serves everything):
 | Path | What |
 |---|---|
 | `/` | Umbrella home: all tools, "coming soon" waitlists (signups in `/admin`) |
-| `/call-keeper` | Call Keeper sales page: agency comparison, ROI calculator, pricing, FAQ |
-| `/call-keeper/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
-| `/signup`, `/app` | The Call Keeper app (installable on the phone's home screen) |
+| `/call-capturer` | Call Capturer sales page: agency comparison, ROI calculator, pricing, FAQ |
+| `/call-capturer/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
+| `/signup`, `/app` | The Call Capturer app (installable on the phone's home screen) |
 | `/admin`, `/admin/trades` | Your operator panel and the trade-script editor |
 
 To add a future tool to the home page, add it to `app/products.py`.
 
-## Call Keeper
+## Call Capturer
 
 An AI receptionist for local tradespeople. The owner forwards the calls they
-miss to their Call Keeper number. When a call comes in, a voice agent answers
+miss to their Call Capturer number. When a call comes in, a voice agent answers
 in their business's name and takes the caller's name, callback number,
 address, the job and how urgent it is. The owner gets a push notification
 and can see every call in a phone-friendly app. A one-tap **ON/OFF** switch
@@ -40,7 +40,7 @@ codes → done.
 Voicemail (when the assistant is OFF, or as a fallback) and calls under 20
 seconds (robocalls, instant hang-ups) are never billed.
 
-The Call Keeper number is **never seen by callers**: they dial the owner's
+The Call Capturer number is **never seen by callers**: they dial the owner's
 usual number, and the owner's phone forwards unanswered calls to it. It only
 has to be in the same country as the owner's phone (forwarding abroad costs
 the owner money).
@@ -66,7 +66,7 @@ the owner money).
 
 ```
 Caller ─► owner's mobile (rings first) ─► not answered / busy / no signal
-       ─► carrier forwards to the Call Keeper Twilio number
+       ─► carrier forwards to the Call Capturer Twilio number
        ─► POST /twilio/voice
             ├─ assistant ON + subscription active:
             │     register call with Retell (business details as dynamic variables)

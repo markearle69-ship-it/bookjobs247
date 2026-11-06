@@ -206,7 +206,7 @@ def _apply_business_details(db: Session, account: Account, form) -> str | None:
     account.service_area = f("service_area", 255)
     account.business_hours = f("business_hours", 255)
     account.owner_phone = normalize(f("owner_phone", 40), account.country)[:32]
-    # Callers never see the Call Keeper number (they dial the owner's own
+    # Callers never see the Call Capturer number (they dial the owner's own
     # number, which forwards), so it doesn't need to be local. For US numbers
     # we still try the owner's own area code first, then fall back to any.
     if account.country == "US" and account.owner_phone.startswith("+1") and len(account.owner_phone) == 12:

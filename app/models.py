@@ -50,7 +50,7 @@ class Account(Base):
     # The ON/OFF switch. ON = AI agent answers, OFF = plain voicemail.
     agent_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Their Call Keeper number, which their phone forwards missed calls to.
+    # Their Call Capturer number, which their phone forwards missed calls to.
     twilio_number: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     twilio_number_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     provisioning_error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -90,7 +90,7 @@ class Account(Base):
 
 
 class Call(Base):
-    """A call that reached the owner's Call Keeper number - answered by the
+    """A call that reached the owner's Call Capturer number - answered by the
     AI agent (kind="agent") or by voicemail (kind="voicemail")."""
 
     __tablename__ = "calls"

@@ -1,7 +1,7 @@
 """Carrier call-forwarding codes shown on the setup page.
 
 The owner sets this up ONCE: "forward calls I don't answer / when I'm busy
-/ when I'm unreachable" to their Call Keeper number. Their phone still rings
+/ when I'm unreachable" to their Call Capturer number. Their phone still rings
 first; only missed calls reach the agent. The ON/OFF switch in the app then
 decides what happens to those missed calls (AI agent vs voicemail), so they
 never need to dial codes again.
@@ -42,7 +42,7 @@ CARRIERS = {
                 note="Verizon forwards calls you don't answer or are busy for."),
         Carrier("other", "Other / landline / VoIP", **_GSM,
                 note="Landlines and VoIP providers (RingCentral, Google Voice, etc.) set forwarding in their app or "
-                     "website: look for 'forward when busy / no answer' and enter your Call Keeper number."),
+                     "website: look for 'forward when busy / no answer' and enter your Call Capturer number."),
     ],
 }
 

@@ -5,9 +5,9 @@ class Settings(BaseSettings):
     # Umbrella brand (the sales site) and this tool's name. Both are only
     # display names - change them here or via env vars, no rebuild needed.
     brand_name: str = "On The Tools"
-    app_name: str = "Call Keeper"
+    app_name: str = "Call Capturer"
     # URL path of this tool's page on the umbrella site.
-    product_slug: str = "call-keeper"
+    product_slug: str = "call-capturer"
     support_email: str = ""
 
     # This service's public HTTPS URL, no trailing slash. Used to build every
