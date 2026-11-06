@@ -58,7 +58,7 @@ def test_other_trade_free_text(client, db):
     assert (a.trade_key, a.trade) == ("other", "Window cleaner")
 
 
-BRAND = {"host": "stressfreeservicesystem.com"}
+BRAND = {"host": "stressfreeservicetools.com"}
 
 
 def test_product_domain_pages(client, db):

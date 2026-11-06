@@ -6,7 +6,7 @@ tool. One deployment serves both domains:
 
 | URL | What |
 |---|---|
-| `stressfreeservicesystem.com/` | Umbrella page: all tools, "coming soon" waitlists (signups in `/admin`). Any other path redirects to callcapturer.com |
+| `stressfreeservicetools.com/` | Umbrella page: all tools, "coming soon" waitlists (signups in `/admin`). Any other path redirects to callcapturer.com |
 | `callcapturer.com/` | Call Capturer sales page: agency comparison, ROI calculator, pricing, FAQ |
 | `callcapturer.com/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
 | `callcapturer.com/signup`, `/app` | The app (installable on the phone's home screen) |
@@ -105,7 +105,7 @@ Some details of the design:
 Accounts you need (all pay-as-you-go): **Railway** (hosting, ~$5–20/mo),
 **Twilio** (numbers + call minutes), **Retell** (the AI voice), **Stripe**
 (billing), **Postmark** (email, free tier to start), and your two domains:
-**callcapturer.com** and **stressfreeservicesystem.com**. Do everything in test mode first (step 8), then switch Stripe to live.
+**callcapturer.com** and **stressfreeservicetools.com**. Do everything in test mode first (step 8), then switch Stripe to live.
 
 ### 1. Domains + hosting (Railway)
 1. (You already own both domains.)
@@ -114,11 +114,11 @@ Accounts you need (all pay-as-you-go): **Railway** (hosting, ~$5–20/mo),
 3. Add a **Postgres** service; on the app service set
    `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
 4. Settings → Networking → **Custom domain**: add `callcapturer.com`,
-   `www.callcapturer.com`, `stressfreeservicesystem.com` and
-   `www.stressfreeservicesystem.com` to the same service. Add the DNS records
+   `www.callcapturer.com`, `stressfreeservicetools.com` and
+   `www.stressfreeservicetools.com` to the same service. Add the DNS records
    Railway shows for each at your registrar.
 5. Set `PUBLIC_BASE_URL=https://callcapturer.com`,
-   `BRAND_URL=https://stressfreeservicesystem.com`, `SECRET_KEY` and
+   `BRAND_URL=https://stressfreeservicetools.com`, `SECRET_KEY` and
    `ADMIN_PASSWORD` (long random strings), `ADMIN_EMAIL`, and
    `SUPPORT_EMAIL=hello@callcapturer.com`.
 

@@ -51,7 +51,7 @@ def _product_page(request: Request, country: str, account, trade=None, questions
 
 @router.get("/")
 def home(request: Request, country: str = "", joined: str = "", account: Account | None = Depends(current_account)):
-    """stressfreeservicesystem.com/ -> umbrella page; callcapturer.com/ -> Call Capturer sales page."""
+    """stressfreeservicetools.com/ -> umbrella page; callcapturer.com/ -> Call Capturer sales page."""
     if is_brand_host(request):
         return _brand_home(request, country, joined, None)
     return _product_page(request, country, account)
