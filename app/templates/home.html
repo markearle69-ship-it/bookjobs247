@@ -8,7 +8,7 @@
     <p>Missed calls, quotes, follow-ups, reviews: the jobs that eat your evenings. {{ settings.brand_name }} is a set of
       simple apps that handle them for a small monthly price, so you can spend your time on paid work.</p>
     <div class="cta-row">
-      <a class="btn" href="/{{ settings.product_slug }}">See {{ settings.app_name }}</a>
+      <a class="btn" href="{{ settings.public_base_url }}">See {{ settings.app_name }}</a>
       <a class="btn ghost" href="#tools">All tools</a>
     </div>
     <p class="small" style="margin-top:14px;color:#9fb0c2">Built by a local service business owner since 2002 · No contracts · No setup fees</p>
@@ -59,7 +59,7 @@
   <section class="card" style="text-align:center">
     <h2>Start with the one that pays for itself</h2>
     <p class="muted">{{ settings.app_name }} answers the calls you miss. Win back one job and it's paid for months.</p>
-    <a class="btn" href="/{{ settings.product_slug }}">See {{ settings.app_name }}</a>
+    <a class="btn" href="{{ settings.public_base_url }}">See {{ settings.app_name }}</a>
   </section>
 </main>
 {% endblock %}

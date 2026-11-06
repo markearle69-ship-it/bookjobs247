@@ -1,21 +1,21 @@
-# On The Tools · Call Capturer
+# StressFree Service · Call Capturer
 
-**On The Tools** is the umbrella brand: one sales site listing a portfolio of
-low-cost apps that do the admin for local service businesses. **Call Capturer**
-is the first tool. Both names are settings (`BRAND_NAME`, `APP_NAME`,
-`PRODUCT_SLUG`), so renaming needs no code change.
+**StressFree Service** is the umbrella brand: a portfolio of low-cost apps that
+do the admin for local service businesses. **Call Capturer** is the first
+tool. One deployment serves both domains:
 
-Site map (one deployment serves everything):
-
-| Path | What |
+| URL | What |
 |---|---|
-| `/` | Umbrella home: all tools, "coming soon" waitlists (signups in `/admin`) |
-| `/call-capturer` | Call Capturer sales page: agency comparison, ROI calculator, pricing, FAQ |
-| `/call-capturer/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
-| `/signup`, `/app` | The Call Capturer app (installable on the phone's home screen) |
-| `/admin`, `/admin/trades` | Your operator panel and the trade-script editor |
+| `stressfreeservicesystem.com/` | Umbrella page: all tools, "coming soon" waitlists (signups in `/admin`). Any other path redirects to callcapturer.com |
+| `callcapturer.com/` | Call Capturer sales page: agency comparison, ROI calculator, pricing, FAQ |
+| `callcapturer.com/for/<trade>` | Per-trade pages (plumbers, electricians, hvac, roofers, locksmiths…) |
+| `callcapturer.com/signup`, `/app` | The app (installable on the phone's home screen) |
+| `callcapturer.com/admin`, `/admin/trades` | Your operator panel and the trade-script editor |
+| `callcapturer.com/tools` | Preview of the umbrella page |
 
-To add a future tool to the home page, add it to `app/products.py`.
+Names and domains are settings (`BRAND_NAME`, `APP_NAME`, `BRAND_URL`,
+`PUBLIC_BASE_URL`), so renaming needs no code change. To add a future tool to
+the umbrella page, add it to `app/products.py`.
 
 ## Call Capturer
 
@@ -104,25 +104,29 @@ Some details of the design:
 
 Accounts you need (all pay-as-you-go): **Railway** (hosting, ~$5–20/mo),
 **Twilio** (numbers + call minutes), **Retell** (the AI voice), **Stripe**
-(billing), **Postmark** (email, free tier to start), and the **onthetools.com**
-domain. Do everything in test mode first (step 8), then switch Stripe to live.
+(billing), **Postmark** (email, free tier to start), and your two domains:
+**callcapturer.com** and **stressfreeservicesystem.com**. Do everything in test mode first (step 8), then switch Stripe to live.
 
-### 1. Domain + hosting (Railway)
-1. Buy `onthetools.com`.
+### 1. Domains + hosting (Railway)
+1. (You already own both domains.)
 2. Railway: New project → **Deploy from GitHub repo** → this repo (it builds
    from the `Dockerfile`; healthcheck `/healthz`). Pick the branch you deploy.
 3. Add a **Postgres** service; on the app service set
    `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
-4. Settings → Networking → **Custom domain** `onthetools.com` (and
-   `www.onthetools.com`); add the DNS records Railway shows at your registrar.
-5. Set `PUBLIC_BASE_URL=https://onthetools.com`, `SECRET_KEY` and
-   `ADMIN_PASSWORD` (long random strings), `ADMIN_EMAIL`, `SUPPORT_EMAIL`.
+4. Settings → Networking → **Custom domain**: add `callcapturer.com`,
+   `www.callcapturer.com`, `stressfreeservicesystem.com` and
+   `www.stressfreeservicesystem.com` to the same service. Add the DNS records
+   Railway shows for each at your registrar.
+5. Set `PUBLIC_BASE_URL=https://callcapturer.com`,
+   `BRAND_URL=https://stressfreeservicesystem.com`, `SECRET_KEY` and
+   `ADMIN_PASSWORD` (long random strings), `ADMIN_EMAIL`, and
+   `SUPPORT_EMAIL=hello@callcapturer.com`.
 
 Tables are created (and later upgraded) automatically on start.
 
 ### 2. Email (Postmark)
-Create a server, verify `onthetools.com` as a sender domain (DNS records), and
-set `POSTMARK_API_TOKEN` and `EMAIL_FROM=hello@onthetools.com`. Email carries
+Create a server, verify `callcapturer.com` as a sender domain (DNS records), and
+set `POSTMARK_API_TOKEN` and `EMAIL_FROM=hello@callcapturer.com`. Email carries
 password resets, "number ready", backup call alerts and win-back emails, so
 do this before taking customers.
 
@@ -130,7 +134,7 @@ do this before taking customers.
 ```bash
 python scripts/generate_vapid_keys.py
 ```
-Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:hello@onthetools.com`.
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:hello@callcapturer.com`.
 **Never change them later**, or every owner has to re-enable notifications.
 
 ### 4. Twilio
@@ -159,7 +163,7 @@ Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:hello@ontheto
 ### 6. Stripe
 1. In **test mode**: `STRIPE_SECRET_KEY=sk_test_... python scripts/setup_stripe.py`
    and set the four printed `STRIPE_PRICE_*` values.
-2. Developers → Webhooks → Add endpoint `https://onthetools.com/webhooks/stripe`
+2. Developers → Webhooks → Add endpoint `https://callcapturer.com/webhooks/stripe`
    with events `checkout.session.completed`, `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`. Set
    `STRIPE_WEBHOOK_SECRET`.
@@ -171,7 +175,7 @@ The scripts in steps 3, 5 and 6 need the env vars. Easiest: Railway → app
 service → **⋯ → Shell** (or `railway run python scripts/...` locally).
 
 ### 8. End-to-end test (Stripe test mode)
-1. Sign up at `https://onthetools.com/signup`, pay with card `4242 4242 4242 4242`.
+1. Sign up at `https://callcapturer.com/signup`, pay with card `4242 4242 4242 4242`.
 2. On your own mobile, tap **Turn on forwarding** on the Setup page.
 3. From another phone, ring your mobile and don't answer. The assistant
    should answer as your business and ask your trade's questions.

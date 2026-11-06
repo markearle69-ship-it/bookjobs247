@@ -15,7 +15,7 @@ from .routes_webhooks import router as webhooks_router
 from .followups import run_forever
 from .migrate import add_missing_columns
 from .trades import seed_trades
-from .web import LoginRequired, RedirectTo
+from .web import LoginRequired, RedirectTo, is_brand_host
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,6 +41,21 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(webhooks_router)
 app.include_router(app_router)
 app.include_router(admin_router)
+
+
+# On the umbrella domain only the home page (and its waitlist form/assets)
+# exist; anything else is sent to the app's own domain so customers only
+# ever log in on one domain.
+_BRAND_PATHS = ("/", "/waitlist", "/healthz", "/tools")
+
+
+@app.middleware("http")
+async def brand_domain_redirect(request: Request, call_next):
+    path = request.url.path
+    if is_brand_host(request) and path not in _BRAND_PATHS and not path.startswith("/static/"):
+        target = settings.url(path) + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(target, status_code=301)
+    return await call_next(request)
 
 
 @app.exception_handler(LoginRequired)

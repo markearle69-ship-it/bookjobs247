@@ -58,6 +58,11 @@ def require_ready_account(account: Account = Depends(require_account)) -> Accoun
     return account
 
 
+def is_brand_host(request: Request) -> bool:
+    host = (request.headers.get("host") or "").split(":")[0].lower().removeprefix("www.")
+    return bool(settings.brand_host) and host == settings.brand_host
+
+
 def region_for(request: Request, override: str = "") -> str:
     """US or GB for public pages: ?country= wins, else the browser language."""
     if override.upper() in ("GB", "UK"):

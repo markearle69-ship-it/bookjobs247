@@ -58,30 +58,45 @@ def test_other_trade_free_text(client, db):
     assert (a.trade_key, a.trade) == ("other", "Window cleaner")
 
 
-def test_trade_landing_pages(client, db):
-    r = client.get("/call-capturer/for/plumbers")
+BRAND = {"host": "stressfreeservicesystem.com"}
+
+
+def test_product_domain_pages(client, db):
+    home = client.get("/")
+    assert "Never miss another job" in home.text and "$500+" in home.text and "Call Capturer" in home.text
+    assert 'href="/for/electricians' in home.text and "StressFree" in home.text
+    r = client.get("/for/plumbers")
     assert r.status_code == 200 and "for plumbers" in r.text and "stopcock" in r.text and "$29" in r.text
     assert "trade=plumber" in r.text
-    assert "£25" in client.get("/call-capturer/for/plumbers", headers={"accept-language": "en-GB,en;q=0.9"}).text
-    assert client.get("/call-capturer/for/nope").status_code == 404
-    old = client.get("/for/plumbers", follow_redirects=False)
-    assert old.status_code == 301 and old.headers["location"] == "/call-capturer/for/plumbers"
-    page = client.get("/call-capturer")
-    assert "$500+" in page.text and "/call-capturer/for/electricians" in page.text and "Call Capturer" in page.text
+    assert "£25" in client.get("/for/plumbers", headers={"accept-language": "en-GB,en;q=0.9"}).text
+    assert client.get("/for/nope").status_code == 404
+    old = client.get("/call-capturer/for/plumbers", follow_redirects=False)
+    assert old.status_code == 301 and old.headers["location"] == "/for/plumbers"
+    assert client.get("/call-capturer", follow_redirects=False).headers["location"] == "/"
 
 
-def test_umbrella_home_and_waitlist(client, db):
+def test_brand_domain_home_and_waitlist(client, db):
     from app.models import WaitlistSignup
-    home = client.get("/")
-    assert "We do the admin." in home.text and "Call Capturer" in home.text and "Coming soon" in home.text
-    assert 'href="/call-capturer"' in home.text
+    home = client.get("/", headers=BRAND)
+    assert "We do the admin." in home.text and "Coming soon" in home.text
+    assert "StressFree <span>Service</span>" in home.text
+    assert 'href="https://bj.example.com"' in home.text  # Call Capturer card -> its own domain
     for _ in range(2):  # duplicate signup is ignored
-        r = client.post("/waitlist", data={"email": "Pat@Example.com", "product": "quotes"}, follow_redirects=False)
+        r = client.post("/waitlist", data={"email": "Pat@Example.com", "product": "quotes"}, headers=BRAND,
+                        follow_redirects=False)
         assert r.headers["location"] == "/?joined=quotes#tools"
-    client.post("/waitlist", data={"email": "x@example.com", "product": "calls"})  # live tool: ignored
+    client.post("/waitlist", data={"email": "x@example.com", "product": "calls"}, headers=BRAND)  # live: ignored
     rows = db.query(WaitlistSignup).all()
     assert [(w.email, w.product) for w in rows] == [("pat@example.com", "quotes")]
-    assert "we'll email you" in client.get("/?joined=quotes").text
+    assert "we'll email you" in client.get("/?joined=quotes", headers=BRAND).text
+
+
+def test_brand_domain_sends_app_paths_to_product_domain(client):
+    for path in ("/signup?trade=plumber", "/login", "/app", "/for/plumbers"):
+        r = client.get(path, headers=BRAND, follow_redirects=False)
+        assert r.status_code == 301 and r.headers["location"] == "https://bj.example.com" + path
+    assert client.get("/static/app.css", headers=BRAND).status_code == 200
+    assert "We do the admin." in client.get("/tools").text  # umbrella preview on the product domain
 
 
 def test_manifest_uses_app_name(client):

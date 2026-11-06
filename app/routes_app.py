@@ -22,7 +22,7 @@ from .push import send_to_account
 from .trades import BY_KEY, BY_SLUG, grouped_trades, marketing_trades
 from .security import (SESSION_COOKIE, SESSION_MAX_AGE, hash_password, make_reset_token, make_session,
                        read_reset_token, verify_password)
-from .web import current_account, next_setup_step, region_for, render, require_account, require_ready_account
+from .web import current_account, is_brand_host, next_setup_step, region_for, render, require_account, require_ready_account
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,15 +37,35 @@ def _login_response(url: str, account: Account) -> RedirectResponse:
 
 # ---------------------------------------------------------------- public
 
-@router.get("/")
-def home(request: Request, country: str = "", joined: str = "", account: Account | None = Depends(current_account)):
+def _brand_home(request: Request, country: str, joined: str, account):
     region = region_for(request, country)
     return render(request, "home.html", account=account, region=region, plan=plan_for(region),
-                  products=products(), joined=joined, marketing_page=True)
+                  products=products(), joined=joined, marketing_page=True, brand_page=True)
+
+
+def _product_page(request: Request, country: str, account, trade=None, questions=None):
+    region = region_for(request, country)
+    return render(request, "landing.html", account=account, region=region, plan=plan_for(region), trade=trade,
+                  marketing=marketing_trades(), questions=questions, marketing_page=True)
+
+
+@router.get("/")
+def home(request: Request, country: str = "", joined: str = "", account: Account | None = Depends(current_account)):
+    """stressfreeservicesystem.com/ -> umbrella page; callcapturer.com/ -> Call Capturer sales page."""
+    if is_brand_host(request):
+        return _brand_home(request, country, joined, None)
+    return _product_page(request, country, account)
+
+
+@router.get("/tools")
+def all_tools(request: Request, country: str = "", joined: str = "",
+              account: Account | None = Depends(current_account)):
+    """The umbrella page, reachable on any domain (handy for previews)."""
+    return _brand_home(request, country, joined, account)
 
 
 @router.post("/waitlist")
-def join_waitlist(email: str = Form(...), product: str = Form(...), trade: str = Form(""),
+def join_waitlist(request: Request, email: str = Form(...), product: str = Form(...), trade: str = Form(""),
                   db: Session = Depends(get_db)):
     email = email.strip().lower()[:255]
     if "@" in email and get_product(product) and get_product(product).status == "soon":
@@ -54,33 +74,31 @@ def join_waitlist(email: str = Form(...), product: str = Form(...), trade: str =
         if not exists:
             db.add(WaitlistSignup(email=email, product=product, trade=trade.strip()[:120]))
             db.commit()
-    return RedirectResponse(f"/?joined={product}#tools", status_code=303)
+    back = "/" if is_brand_host(request) else "/tools"
+    return RedirectResponse(f"{back}?joined={product}#tools", status_code=303)
 
 
-@router.get(f"/{settings.product_slug}")
-def product_page(request: Request, country: str = "", account: Account | None = Depends(current_account)):
-    region = region_for(request, country)
-    return render(request, "landing.html", account=account, region=region, plan=plan_for(region),
-                  trade=None, marketing=marketing_trades(), questions=None, marketing_page=True)
-
-
-@router.get(f"/{settings.product_slug}/for/{{slug}}")
+@router.get("/for/{slug}")
 def trade_page(request: Request, slug: str, country: str = "", account: Account | None = Depends(current_account),
                db: Session = Depends(get_db)):
     t = BY_SLUG.get(slug)
     if t is None:
         raise HTTPException(status_code=404)
     row = db.get(TradeTemplate, t.key)
-    region = region_for(request, country)
     questions = [q.lstrip("- ").strip() for q in ((row.questions if row else t.questions) or "").splitlines()
                  if q.strip()]
-    return render(request, "landing.html", account=account, region=region, plan=plan_for(region), trade=t,
-                  marketing=marketing_trades(), questions=questions, marketing_page=True)
+    return _product_page(request, country, account, trade=t, questions=questions)
 
 
-@router.get("/for/{slug}")
+# Old URLs from before Call Capturer had its own domain.
+@router.get("/call-capturer")
+def old_product_page():
+    return RedirectResponse("/", status_code=301)
+
+
+@router.get("/call-capturer/for/{slug}")
 def old_trade_page(slug: str):
-    return RedirectResponse(f"/{settings.product_slug}/for/{slug}", status_code=301)
+    return RedirectResponse(f"/for/{slug}", status_code=301)
 
 
 @router.get("/signup")

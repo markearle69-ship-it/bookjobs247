@@ -1,4 +1,4 @@
-"""The On The Tools portfolio, as shown on the umbrella home page.
+"""The StressFree Service portfolio, as shown on the umbrella home page.
 
 Add a tool here and it appears on the home page. "live" tools link to their
 own page; "soon" tools show a "Tell me when it's ready" signup, so you can
@@ -26,7 +26,7 @@ def products() -> list[Product]:
         Product("calls", settings.app_name, "live", "📞",
                 "Never miss a job because you were on one.",
                 "An AI receptionist answers the calls you miss, takes the full job details and puts them on your phone.",
-                url=f"/{settings.product_slug}"),
+                url=settings.public_base_url),
         Product("quotes", "Quotes", "soon", "🧾",
                 "Professional quotes in two minutes, from your van.",
                 "Describe the job, get a tidy, branded quote to send while you're still on site."),

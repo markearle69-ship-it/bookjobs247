@@ -2,12 +2,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Umbrella brand (the sales site) and this tool's name. Both are only
-    # display names - change them here or via env vars, no rebuild needed.
-    brand_name: str = "On The Tools"
+    # Display names only - change via env vars, no rebuild needed.
+    brand_name: str = "StressFree Service"
     app_name: str = "Call Capturer"
-    # URL path of this tool's page on the umbrella site.
-    product_slug: str = "call-capturer"
+    # The umbrella site's URL. Requests arriving on that domain get the
+    # umbrella home page at "/"; everything else (the app, signup, trade pages)
+    # lives on PUBLIC_BASE_URL (callcapturer.com). One deployment serves both.
+    brand_url: str = ""
     support_email: str = ""
 
     # This service's public HTTPS URL, no trailing slash. Used to build every
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     # request signatures, which are computed over the exact public URL.
     public_base_url: str = "http://localhost:8000"
 
-    database_url: str = "sqlite:///./onthetools.db"
+    database_url: str = "sqlite:///./callcapturer.db"
 
     # Signs login sessions and password-reset links. Empty = refuse to start
     # (see main.py) rather than silently signing with a guessable key.
@@ -68,6 +69,12 @@ class Settings(BaseSettings):
 
     def url(self, path: str) -> str:
         return self.public_base_url.rstrip("/") + path
+
+    @property
+    def brand_host(self) -> str:
+        from urllib.parse import urlparse
+        host = urlparse(self.brand_url).hostname or ""
+        return host.removeprefix("www.")
 
 
 settings = Settings()

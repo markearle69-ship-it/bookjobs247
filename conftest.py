@@ -7,6 +7,7 @@ os.environ.update({
     "SECRET_KEY": "test-secret",
     "ADMIN_PASSWORD": "admin-pw",
     "PUBLIC_BASE_URL": "https://bj.example.com",
+    "BRAND_URL": "https://stressfreeservicesystem.com",
     "RETELL_API_KEY": "retell-key",
     "RETELL_AGENT_ID_US_FEMALE": "agent_us_f",
     "RETELL_AGENT_ID_US_MALE": "agent_us_m",
